@@ -2,6 +2,11 @@
 
 All notable changes to the "heyhuman" extension will be documented in this file.
 
+## [1.1.1] - 2026-10-12
+
+### Fixed
+- **Notification Focus Action**: Resolved issue where clicking "Focus Editor" didn't activate the pending permission context. Implemented OS-level window activation (macOS `open -a` / `osascript` and Windows PowerShell) to bring the host window to the front, and automatically routes focus to the active Chat panel or Integrated Terminal where the AI permission prompt is waiting.
+
 ## [1.1.0] - 2026-10-12
 
 ### Added
