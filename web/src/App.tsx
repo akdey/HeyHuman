@@ -10,7 +10,10 @@ import {
   QrCode, 
   RefreshCw,
   X,
-  ExternalLink
+  ExternalLink,
+  Bell,
+  BellOff,
+  Sun
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -50,10 +53,83 @@ export function App() {
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [showQR, setShowQR] = useState<boolean>(false);
 
+  const [isPushSubscribed, setIsPushSubscribed] = useState<boolean>(false);
+  const [isWakeLocked, setIsWakeLocked] = useState<boolean>(false);
+  const wakeLockRef = useRef<any>(null);
+
   const lastSeenIdRef = useRef<string | null>(null);
   const pollerRef = useRef<number | null>(null);
 
   const roomUrl = `${window.location.origin}?room=${room}`;
+
+  // Helper: Convert urlBase64 to Uint8Array for PushManager
+  function urlBase64ToUint8Array(base64String: string) {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+
+  // Request Web Push Subscription
+  const subscribeToWebPush = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      return;
+    }
+
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      // Get public VAPID key
+      const res = await fetch(`/api/alert?room=${encodeURIComponent(room)}`);
+      const data = await res.json();
+      const vapidKey = data.vapidPublicKey;
+
+      if (!vapidKey) return;
+
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey)
+      });
+
+      // Send to server
+      await fetch(`/api/alert?room=${encodeURIComponent(room)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'subscribe_push',
+          subscription: sub
+        })
+      });
+
+      setIsPushSubscribed(true);
+    } catch (e) {
+      console.warn('Push subscription failed:', e);
+    }
+  };
+
+  // Screen Wake Lock API (keeps mobile screen awake like a desk clock)
+  const toggleWakeLock = async () => {
+    if ('wakeLock' in navigator) {
+      try {
+        if (!isWakeLocked) {
+          wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+          setIsWakeLocked(true);
+          wakeLockRef.current.addEventListener('release', () => {
+            setIsWakeLocked(false);
+          });
+        } else if (wakeLockRef.current) {
+          await wakeLockRef.current.release();
+          wakeLockRef.current = null;
+          setIsWakeLocked(false);
+        }
+      } catch (err) {
+        console.warn('Wake lock error:', err);
+      }
+    }
+  };
 
   // Save room on change & update URL
   const updateRoom = (newRoom: string) => {
@@ -67,12 +143,23 @@ export function App() {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, room);
+    if ('serviceWorker' in navigator && Notification.permission === 'granted') {
+      subscribeToWebPush();
+    }
   }, [room]);
 
-  // Request browser notification permission once
+  // Request browser notification permission and register push
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        subscribeToWebPush();
+      } else if (Notification.permission === 'default') {
+        Notification.requestPermission().then(perm => {
+          if (perm === 'granted') {
+            subscribeToWebPush();
+          }
+        });
+      }
     }
   }, []);
 
@@ -242,7 +329,53 @@ export function App() {
           <span style={{ fontSize: '1.1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>HeyHuman</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          {/* Lock Screen Push Status Pill */}
+          <button
+            onClick={subscribeToWebPush}
+            title={isPushSubscribed ? 'Web Push Active: Alerts will wake your phone when locked' : 'Enable Web Push for lock screen alerts'}
+            style={{
+              background: isPushSubscribed ? 'rgba(52, 199, 89, 0.12)' : 'rgba(255, 255, 255, 0.06)',
+              border: `1px solid ${isPushSubscribed ? 'rgba(52, 199, 89, 0.3)' : 'var(--border)'}`,
+              color: isPushSubscribed ? 'var(--accent-green)' : 'var(--text-3)',
+              borderRadius: '999px',
+              padding: '0.35rem 0.65rem',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.3rem',
+              cursor: 'pointer'
+            }}
+          >
+            {isPushSubscribed ? <Bell size={13} /> : <BellOff size={13} />}
+            {isPushSubscribed ? 'Push Active' : 'Lock Alert'}
+          </button>
+
+          {/* Screen Awake / Dock Pill (Keeps screen awake on desk) */}
+          {'wakeLock' in navigator && (
+            <button
+              onClick={toggleWakeLock}
+              title={isWakeLocked ? 'Screen Wake Lock Active (Screen stays on like a desk clock)' : 'Keep Screen On (Desk Dock Mode)'}
+              style={{
+                background: isWakeLocked ? 'rgba(255, 204, 0, 0.15)' : 'rgba(255, 255, 255, 0.06)',
+                border: `1px solid ${isWakeLocked ? 'rgba(255, 204, 0, 0.4)' : 'var(--border)'}`,
+                color: isWakeLocked ? '#ffcc00' : 'var(--text-3)',
+                borderRadius: '999px',
+                padding: '0.35rem 0.55rem',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                cursor: 'pointer'
+              }}
+            >
+              <Sun size={13} />
+              {isWakeLocked ? 'Awake' : 'Stay On'}
+            </button>
+          )}
+
           {/* Audio State Pill */}
           <button
             onClick={isAudioUnlocked ? () => setIsAudioUnlocked(false) : handleUnlockAudio}
@@ -251,17 +384,17 @@ export function App() {
               border: `1px solid ${isAudioUnlocked ? 'rgba(52, 199, 89, 0.3)' : 'var(--border)'}`,
               color: isAudioUnlocked ? 'var(--accent-green)' : 'var(--text-2)',
               borderRadius: '999px',
-              padding: '0.35rem 0.75rem',
-              fontSize: '0.78rem',
+              padding: '0.35rem 0.65rem',
+              fontSize: '0.75rem',
               fontWeight: 600,
               display: 'flex',
               alignItems: 'center',
-              gap: '0.35rem',
+              gap: '0.3rem',
               cursor: 'pointer'
             }}
           >
-            {isAudioUnlocked ? <Volume2 size={14} /> : <VolumeX size={14} />}
-            {isAudioUnlocked ? 'Sound On' : 'Tap for Sound'}
+            {isAudioUnlocked ? <Volume2 size={13} /> : <VolumeX size={13} />}
+            {isAudioUnlocked ? 'Sound On' : 'Sound'}
           </button>
 
           <button
@@ -271,8 +404,8 @@ export function App() {
               border: '1px solid var(--border)',
               color: 'var(--text-1)',
               borderRadius: '999px',
-              padding: '0.35rem 0.8rem',
-              fontSize: '0.78rem',
+              padding: '0.35rem 0.7rem',
+              fontSize: '0.75rem',
               fontWeight: 600,
               cursor: 'pointer'
             }}

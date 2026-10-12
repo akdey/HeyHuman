@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['logo.svg', 'logo.png', 'sounds/*.wav'],
+      includeAssets: ['logo.svg', 'logo.png', 'sounds/*.wav', 'custom-sw.js'],
       manifest: {
         name: 'HeyHuman · AI Permission Siren',
         short_name: 'HeyHuman',
@@ -27,7 +27,8 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,wav,ico}']
+        globPatterns: ['**/*.{js,css,html,svg,png,wav,ico}'],
+        importScripts: ['/custom-sw.js']
       }
     })
   ]
