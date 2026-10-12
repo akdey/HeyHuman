@@ -2,23 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   Volume2, 
   VolumeX, 
-  Radio, 
   ShieldAlert, 
   CheckCircle2, 
   Trash2, 
   Copy, 
   Check, 
-  Smartphone, 
-  Bot, 
   QrCode, 
-  Shuffle, 
-  Volume1, 
-  ExternalLink, 
-  BookmarkCheck, 
-  Save, 
-  Wrench, 
-  Sparkles,
-  Layers
+  X,
+  ExternalLink
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -34,77 +25,48 @@ interface AlertItem {
   resolved?: boolean;
 }
 
-const STORAGE_KEY_ROOM = 'heyhuman_saved_room';
-const RANDOM_ADJECTIVES = ['hyper', 'swift', 'zero', 'cyber', 'silent', 'delta', 'vivid', 'quantum', 'zen'];
-const RANDOM_NOUNS = ['lynx', 'falcon', 'matrix', 'beacon', 'badger', 'panther', 'nexus', 'pulse', 'orbit'];
-
-function generateRandomRoom(): string {
-  const adj = RANDOM_ADJECTIVES[Math.floor(Math.random() * RANDOM_ADJECTIVES.length)];
-  const noun = RANDOM_NOUNS[Math.floor(Math.random() * RANDOM_NOUNS.length)];
-  const num = Math.floor(100 + Math.random() * 900);
-  return `${adj}-${noun}-${num}`;
-}
+const STORAGE_KEY = 'heyhuman_room';
 
 export function App() {
   const searchParams = new URLSearchParams(window.location.search);
   const paramRoom = searchParams.get('room');
-  const savedRoom = localStorage.getItem(STORAGE_KEY_ROOM);
+  const savedRoom = localStorage.getItem(STORAGE_KEY);
+  const activeRoom = (paramRoom || savedRoom || 'akdey').toLowerCase().replace(/[^a-z0-9_-]/g, '');
 
-  // Auto-tune: URL param > Saved Room > 'my-workspace'
-  const initialRoom = paramRoom || savedRoom || 'my-workspace';
-
-  const [room, setRoom] = useState<string>(initialRoom);
-  const [savedStatus, setSavedStatus] = useState<boolean>(savedRoom === initialRoom);
+  const [room, setRoom] = useState<string>(activeRoom);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
-  const [isAudioEnabled, setIsAudioEnabled] = useState<boolean>(false);
+  const [isAudioUnlocked, setIsAudioUnlocked] = useState<boolean>(false);
   const [soundType, setSoundType] = useState<'siren' | 'alarm' | 'chime' | 'beep'>('siren');
-  const [isSpeechEnabled, setIsSpeechEnabled] = useState<boolean>(true);
-  const [isSettingCopied, setIsSettingCopied] = useState<boolean>(false);
-  const [isTesting, setIsTesting] = useState<boolean>(false);
-  const [isFlashing, setIsFlashing] = useState<boolean>(false);
+  const [isCopied, setIsCopied] = useState<boolean>(false);
   const [showQR, setShowQR] = useState<boolean>(false);
-  const [activePendingCount, setActivePendingCount] = useState<number>(0);
-
-  // Diagnostics & Troubleshoot State
-  const [showTroubleshoot, setShowTroubleshoot] = useState<boolean>(false);
-  const [lastPingStatus, setLastPingStatus] = useState<'idle' | 'checking' | 'healthy' | 'error'>('idle');
 
   const lastSeenIdRef = useRef<string | null>(null);
   const pollerRef = useRef<number | null>(null);
 
   const roomUrl = `${window.location.origin}?room=${room}`;
 
+  // Save room on change & update URL
+  const updateRoom = (newRoom: string) => {
+    const clean = newRoom.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    setRoom(clean);
+    localStorage.setItem(STORAGE_KEY, clean);
+    const url = new URL(window.location.href);
+    url.searchParams.set('room', clean);
+    window.history.replaceState({}, '', url.toString());
+  };
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, room);
+  }, [room]);
+
+  // Request browser notification permission once
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
   }, []);
 
-  const handleRoomChange = (newRoom: string) => {
-    const sanitized = newRoom.toLowerCase().replace(/[^a-z0-9_-]/g, '');
-    setRoom(sanitized);
-    setSavedStatus(localStorage.getItem(STORAGE_KEY_ROOM) === sanitized);
-    const url = new URL(window.location.href);
-    url.searchParams.set('room', sanitized);
-    window.history.replaceState({}, '', url.toString());
-  };
-
-  const handleSaveRoom = () => {
-    localStorage.setItem(STORAGE_KEY_ROOM, room);
-    setSavedStatus(true);
-    confetti({
-      particleCount: 30,
-      spread: 50,
-      origin: { y: 0.25 },
-      colors: ['#06b6d4', '#3b82f6', '#ffffff']
-    });
-  };
-
-  const handleRandomRoom = () => {
-    const r = generateRandomRoom();
-    handleRoomChange(r);
-  };
-
+  // Poll room alerts from Vercel serverless relay
   useEffect(() => {
     const fetchAlerts = async () => {
       try {
@@ -112,24 +74,21 @@ export function App() {
         if (!res.ok) return;
         const data = await res.json();
         if (data.ok && Array.isArray(data.alerts)) {
-          const fetchedAlerts: AlertItem[] = data.alerts;
-          setAlerts(fetchedAlerts);
+          const list: AlertItem[] = data.alerts;
+          setAlerts(list);
 
-          const pending = fetchedAlerts.filter(a => !a.resolved);
-          setActivePendingCount(pending.length);
+          const pending = list.filter(a => !a.resolved);
 
           if (pending.length > 0) {
             const newest = pending[0];
             if (newest.id !== lastSeenIdRef.current) {
               lastSeenIdRef.current = newest.id;
-              triggerAlertSequence(newest);
+              fireAlert(newest);
             }
-          } else {
-            setIsFlashing(false);
           }
         }
       } catch {
-        // Silently retry
+        // Silently retry on next poll
       }
     };
 
@@ -139,18 +98,14 @@ export function App() {
     return () => {
       if (pollerRef.current) window.clearInterval(pollerRef.current);
     };
-  }, [room, isAudioEnabled, isSpeechEnabled, soundType]);
+  }, [room, isAudioUnlocked, soundType]);
 
-  const triggerAlertSequence = (item: AlertItem) => {
-    setIsFlashing(true);
-
-    if (isAudioEnabled) {
+  const fireAlert = (item: AlertItem) => {
+    if (isAudioUnlocked) {
       audioAlertEngine.playSound(soundType);
-      if (isSpeechEnabled) {
-        setTimeout(() => {
-          audioAlertEngine.speak(`Hey human! ${item.agent} is asking for your permission!`);
-        }, 850);
-      }
+      setTimeout(() => {
+        audioAlertEngine.speak(`Hey human! ${item.agent} needs approval.`);
+      }, 700);
     }
 
     if ('vibrate' in navigator) {
@@ -159,8 +114,8 @@ export function App() {
 
     if ('Notification' in window && Notification.permission === 'granted') {
       try {
-        new Notification(`HeyHuman · ${item.agent}`, {
-          body: item.description || `Approval required: ${item.tool || 'Action'}`,
+        new Notification(`HeyHuman: ${item.agent}`, {
+          body: item.description || 'Action awaiting your permission',
           icon: '/logo.png',
           tag: item.id
         });
@@ -170,858 +125,479 @@ export function App() {
     }
   };
 
-  const enableAudio = () => {
-    const success = audioAlertEngine.unlockAudio();
-    if (success) {
-      setIsAudioEnabled(true);
+  const handleUnlockAudio = () => {
+    const ok = audioAlertEngine.unlockAudio();
+    if (ok) {
+      setIsAudioUnlocked(true);
       audioAlertEngine.playSound('chime');
     }
   };
 
-  const handleTestAlert = async () => {
-    enableAudio();
-    setIsTesting(true);
-
+  const handleTestAlert = () => {
+    handleUnlockAudio();
     const testItem: AlertItem = {
       id: `test_${Date.now()}`,
-      agent: 'Claude Code',
-      type: 'Terminal Command',
-      tool: 'bash',
-      description: 'npm run deploy:production requires user confirmation',
+      agent: 'AI Agent',
+      type: 'Permission Request',
+      tool: 'Terminal',
+      description: 'Test permission alert is working properly',
       timestamp: Date.now(),
       resolved: false
     };
 
-    triggerAlertSequence(testItem);
+    fireAlert(testItem);
 
-    try {
-      await fetch(`/api/alert?room=${encodeURIComponent(room)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(testItem)
-      });
-    } catch {
+    fetch(`/api/alert?room=${encodeURIComponent(room)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(testItem)
+    }).catch(() => {
       setAlerts(prev => [testItem, ...prev]);
-    }
-
-    setTimeout(() => setIsTesting(false), 1400);
+    });
   };
 
-  const handleRunTroubleshoot = async () => {
-    setLastPingStatus('checking');
-    try {
-      const res = await fetch(`/api/alert?room=${encodeURIComponent(room)}`);
-      if (res.ok) {
-        setLastPingStatus('healthy');
-      } else {
-        setLastPingStatus('error');
-      }
-    } catch {
-      setLastPingStatus('error');
-    }
-  };
-
-  const handleResolve = async (id: string) => {
+  const handleResolve = (id: string) => {
     confetti({
-      particleCount: 50,
-      spread: 70,
-      origin: { y: 0.65 },
-      colors: ['#f43f5e', '#3b82f6', '#10b981', '#ffffff']
+      particleCount: 40,
+      spread: 60,
+      origin: { y: 0.6 }
     });
 
     setAlerts(prev => prev.map(a => a.id === id ? { ...a, resolved: true } : a));
-    setIsFlashing(false);
 
-    try {
-      await fetch(`/api/alert?room=${encodeURIComponent(room)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'resolve', id })
-      });
-    } catch {
-      // Ignore
-    }
+    fetch(`/api/alert?room=${encodeURIComponent(room)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'resolve', id })
+    }).catch(() => {});
   };
 
-  const handleClearAll = async () => {
+  const handleClear = () => {
     setAlerts([]);
-    setIsFlashing(false);
     lastSeenIdRef.current = null;
-    try {
-      await fetch(`/api/alert?room=${encodeURIComponent(room)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'clear' })
-      });
-    } catch {
-      // Ignore
-    }
+    fetch(`/api/alert?room=${encodeURIComponent(room)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'clear' })
+    }).catch(() => {});
   };
 
-  const copyRoomIdOnly = () => {
+  const copyRoom = () => {
     navigator.clipboard.writeText(room);
-    setIsSettingCopied(true);
-    setTimeout(() => setIsSettingCopied(false), 2000);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
   };
+
+  const pendingAlert = alerts.find(a => !a.resolved);
 
   return (
-    <div className={`min-h-screen flex flex-col ${isFlashing ? 'screen-flashing' : ''}`} style={{ paddingBottom: '3.5rem' }}>
+    <div style={{
+      maxWidth: '560px',
+      margin: '0 auto',
+      padding: '1.5rem 1.25rem 3rem 1.25rem',
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'space-between'
+    }}>
       
-      {/* Mobile Audio Activation Bar */}
-      {!isAudioEnabled && (
-        <div style={{
-          backgroundColor: '#111827',
-          borderBottom: '1px solid rgba(59, 130, 246, 0.25)',
-          color: '#e2e8f0',
-          padding: '0.65rem 1rem',
-          textAlign: 'center',
-          fontSize: '0.85rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '0.85rem',
-          fontWeight: 500
-        }}>
-          <Smartphone size={16} color="#60a5fa" />
-          <span>Tap to unlock sound sirens & voice speech on this phone</span>
-          <button 
-            onClick={enableAudio}
-            className="interactive-hover"
+      {/* 1. Header (Ultra Clean) */}
+      <header style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingBottom: '1.25rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <img src="/logo.svg" alt="HeyHuman" style={{ width: '28px', height: '28px' }} />
+          <span style={{ fontSize: '1.1rem', fontWeight: 700, letterSpacing: '-0.02em' }}>HeyHuman</span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {/* Audio State Pill */}
+          <button
+            onClick={isAudioUnlocked ? () => setIsAudioUnlocked(false) : handleUnlockAudio}
             style={{
-              background: '#3b82f6',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '0.3rem 0.85rem',
+              background: isAudioUnlocked ? 'rgba(52, 199, 89, 0.12)' : 'rgba(255, 255, 255, 0.06)',
+              border: `1px solid ${isAudioUnlocked ? 'rgba(52, 199, 89, 0.3)' : 'var(--border)'}`,
+              color: isAudioUnlocked ? 'var(--accent-green)' : 'var(--text-2)',
+              borderRadius: '999px',
+              padding: '0.35rem 0.75rem',
+              fontSize: '0.78rem',
               fontWeight: 600,
-              fontSize: '0.8rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
               cursor: 'pointer'
             }}
           >
-            Enable Sound
+            {isAudioUnlocked ? <Volume2 size={14} /> : <VolumeX size={14} />}
+            {isAudioUnlocked ? 'Sound On' : 'Tap for Sound'}
           </button>
-        </div>
-      )}
 
-      {/* Main App Navigation */}
-      <header style={{
-        padding: '1.1rem 1.25rem',
-        borderBottom: '1px solid var(--border)',
-        backgroundColor: 'rgba(13, 17, 26, 0.85)',
-        backdropFilter: 'blur(16px)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 50
-      }}>
-        <div style={{
-          maxWidth: '1020px',
-          margin: '0 auto',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '0.75rem'
-        }}>
-          {/* Brand */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '11px',
-              background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.12), rgba(59, 130, 246, 0.12))',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}>
-              <img src="/logo.svg" alt="HeyHuman Logo" style={{ width: '26px', height: '26px' }} />
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1.2rem', fontWeight: 800, letterSpacing: '-0.03em', color: '#ffffff' }}>HeyHuman</span>
-                <span style={{
-                  fontSize: '0.65rem',
-                  fontWeight: 700,
-                  letterSpacing: '0.06em',
-                  background: 'rgba(244, 63, 94, 0.12)',
-                  color: '#f43f5e',
-                  border: '1px solid rgba(244, 63, 94, 0.25)',
-                  padding: '0.12rem 0.45rem',
-                  borderRadius: '6px'
-                }}>
-                  RELAY
-                </span>
-              </div>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', fontWeight: 500 }}>
-                Audible siren when your autonomous AI agent needs your approval
-              </p>
-            </div>
-          </div>
-
-          {/* Quick Header Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <button
-              onClick={() => setShowTroubleshoot(!showTroubleshoot)}
-              className="interactive-hover"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                padding: '0.45rem 0.8rem',
-                background: showTroubleshoot ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-secondary)',
-                color: showTroubleshoot ? '#60a5fa' : 'var(--text-muted)',
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-                fontWeight: 600
-              }}
-            >
-              <Wrench size={15} />
-              Troubleshoot
-            </button>
-
-            <button
-              onClick={() => setIsAudioEnabled(!isAudioEnabled)}
-              className="interactive-hover"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.45rem 0.8rem',
-                background: isAudioEnabled ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)',
-                color: isAudioEnabled ? '#10b981' : '#f43f5e',
-                border: `1px solid ${isAudioEnabled ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)'}`,
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-                fontWeight: 600
-              }}
-            >
-              {isAudioEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
-              {isAudioEnabled ? 'Audio Live' : 'Muted'}
-            </button>
-
-            <button
-              onClick={handleTestAlert}
-              disabled={isTesting}
-              className="interactive-hover"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.45rem 0.95rem',
-                background: 'linear-gradient(135deg, #f43f5e, #e11d48)',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                boxShadow: '0 4px 14px rgba(244, 63, 94, 0.3)'
-              }}
-            >
-              <ShieldAlert size={15} />
-              Test Siren
-            </button>
-          </div>
+          <button
+            onClick={handleTestAlert}
+            style={{
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-1)',
+              borderRadius: '999px',
+              padding: '0.35rem 0.8rem',
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            Test
+          </button>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main style={{
-        maxWidth: '1020px',
-        margin: '0 auto',
-        width: '100%',
-        padding: '1.5rem 1.25rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1.5rem'
-      }}>
-
-        {/* Diagnostics & Troubleshoot Panel */}
-        {showTroubleshoot && (
-          <div className="glass-panel" style={{
-            borderRadius: '14px',
-            padding: '1.35rem',
-            border: '1px solid rgba(59, 130, 246, 0.4)',
-            background: 'rgba(15, 23, 42, 0.95)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Wrench size={18} color="#60a5fa" />
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#ffffff' }}>
-                  Connection & Room Diagnostics
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowTroubleshoot(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-subtle)', cursor: 'pointer', fontSize: '0.85rem' }}
-              >
-                ✕ Close
-              </button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
-              <div style={{ background: 'var(--bg-secondary)', padding: '0.9rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-subtle)', fontWeight: 600 }}>Active Channel:</span>
-                <p className="mono" style={{ fontSize: '0.9rem', color: '#06b6d4', fontWeight: 600, marginTop: '0.2rem' }}>{room}</p>
-                <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
-                  {savedStatus ? '✓ Saved as your default room.' : 'Not saved yet. Tap "Save as Default" to remember.'}
-                </p>
-              </div>
-
-              <div style={{ background: 'var(--bg-secondary)', padding: '0.9rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-subtle)', fontWeight: 600 }}>Relay Health Check:</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem' }}>
-                  <button
-                    onClick={handleRunTroubleshoot}
-                    disabled={lastPingStatus === 'checking'}
-                    className="interactive-hover"
-                    style={{
-                      background: 'rgba(59, 130, 246, 0.2)',
-                      color: '#60a5fa',
-                      border: '1px solid rgba(59, 130, 246, 0.4)',
-                      borderRadius: '6px',
-                      padding: '0.3rem 0.75rem',
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {lastPingStatus === 'checking' ? 'Pinging...' : 'Ping Relay Server'}
-                  </button>
-                  {lastPingStatus === 'healthy' && <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>● Connected OK</span>}
-                  {lastPingStatus === 'error' && <span style={{ fontSize: '0.75rem', color: '#f43f5e', fontWeight: 600 }}>● Connection Failed</span>}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+      {/* 2. Hero Status / Alarm Beacon */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '0.5rem' }}>
         
-        {/* Active Alert Banner (When an AI tool is waiting) */}
-        {activePendingCount > 0 && (
+        {/* BIG HERO: Active Alarm OR Listening Radar */}
+        {pendingAlert ? (
           <div 
-            className="siren-active"
+            className="alarm-active"
             style={{
-              background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.18), rgba(15, 23, 42, 0.8))',
-              backdropFilter: 'blur(16px)',
-              border: '1px solid #f43f5e',
-              borderRadius: '14px',
-              padding: '1.35rem 1.5rem',
+              background: 'linear-gradient(180deg, rgba(255, 59, 48, 0.15) 0%, rgba(18, 20, 28, 0.8) 100%)',
+              border: '1.5px solid var(--accent-red)',
+              borderRadius: '24px',
+              padding: '2rem 1.5rem',
+              textAlign: 'center',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '1.25rem',
-              flexWrap: 'wrap'
+              gap: '1.25rem'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{
-                background: '#f43f5e',
-                color: '#ffffff',
-                borderRadius: '12px',
-                width: '46px',
-                height: '46px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                boxShadow: '0 0 24px rgba(244, 63, 94, 0.6)'
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'var(--accent-red)',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 0 30px rgba(255, 59, 48, 0.6)'
+            }}>
+              <ShieldAlert size={34} />
+            </div>
+
+            <div>
+              <span style={{
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                color: 'var(--accent-red)',
+                textTransform: 'uppercase'
               }}>
-                <ShieldAlert size={26} />
-              </div>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff' }}>
-                    APPROVAL REQUIRED ({activePendingCount})
-                  </h3>
-                </div>
-                <p style={{ fontSize: '0.85rem', color: '#cbd5e1', marginTop: '0.15rem' }}>
-                  Your autonomous agent is suspended waiting for permission in your editor/terminal.
-                </p>
-              </div>
+                {pendingAlert.agent}
+              </span>
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '0.2rem', letterSpacing: '-0.02em' }}>
+                Approval Required
+              </h2>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-2)', marginTop: '0.4rem', lineHeight: '1.4' }}>
+                {pendingAlert.description}
+              </p>
             </div>
 
             <button
-              onClick={() => {
-                const pending = alerts.find(a => !a.resolved);
-                if (pending) handleResolve(pending.id);
-              }}
-              className="interactive-hover"
+              onClick={() => handleResolve(pendingAlert.id)}
               style={{
+                background: 'var(--accent-green)',
+                color: '#000000',
+                border: 'none',
+                borderRadius: '14px',
+                padding: '0.85rem 2rem',
+                fontSize: '0.95rem',
+                fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.45rem',
-                background: '#10b981',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '0.7rem 1.4rem',
-                fontSize: '0.9rem',
-                fontWeight: 700,
+                gap: '0.5rem',
                 cursor: 'pointer',
-                boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)'
+                boxShadow: '0 4px 18px rgba(52, 199, 89, 0.4)'
               }}
             >
               <CheckCircle2 size={18} />
-              Acknowledge & Silence
+              Silence & Done
             </button>
+          </div>
+        ) : (
+          <div style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: '24px',
+            padding: '2.5rem 1.5rem',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '1rem',
+            position: 'relative'
+          }}>
+            {/* Minimalist Radar Beacon */}
+            <div style={{
+              width: '72px',
+              height: '72px',
+              borderRadius: '50%',
+              background: 'rgba(52, 199, 89, 0.08)',
+              border: '1.5px solid rgba(52, 199, 89, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative'
+            }}>
+              <div className="radar-ring" style={{
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+                borderRadius: '50%',
+                border: '1px solid var(--accent-green)'
+              }} />
+              <div style={{
+                width: '12px',
+                height: '12px',
+                borderRadius: '50%',
+                background: 'var(--accent-green)',
+                boxShadow: '0 0 12px var(--accent-green)'
+              }} />
+            </div>
+
+            <div>
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
+                Listening on "{room}"
+              </h2>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-2)', marginTop: '0.35rem' }}>
+                Your phone will siren when any AI agent asks for permission.
+              </p>
+            </div>
           </div>
         )}
 
-        {/* Workspace Room Pairing Card */}
-        <section className="glass-panel" style={{
-          borderRadius: '14px',
-          padding: '1.35rem',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
-          gap: '1.5rem'
+        {/* 3. Room & Pairing (Single Clean Card) */}
+        <section style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: '20px',
+          padding: '1.25rem'
         }}>
-          {/* Room Configuration */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <label style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <Radio size={13} color="#06b6d4" />
-                Alert Room Channel
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                {savedStatus ? (
-                  <span style={{ fontSize: '0.7rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.2rem', fontWeight: 600 }}>
-                    <BookmarkCheck size={12} /> Default Room
-                  </span>
-                ) : (
-                  <button
-                    onClick={handleSaveRoom}
-                    className="interactive-hover"
-                    style={{
-                      background: 'rgba(59, 130, 246, 0.15)',
-                      color: '#60a5fa',
-                      border: '1px solid rgba(59, 130, 246, 0.3)',
-                      borderRadius: '5px',
-                      padding: '0.15rem 0.5rem',
-                      fontSize: '0.7rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.25rem'
-                    }}
-                  >
-                    <Save size={11} /> Save as Default
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.4rem' }}>
-              <input 
-                type="text"
-                value={room}
-                onChange={e => handleRoomChange(e.target.value)}
-                placeholder="e.g. akdey"
-                className="mono"
-                style={{
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text-main)',
-                  padding: '0.55rem 0.8rem',
-                  borderRadius: '8px',
-                  fontSize: '0.9rem',
-                  fontWeight: 600,
-                  flex: 1,
-                  outline: 'none'
-                }}
-              />
-              <button
-                onClick={handleRandomRoom}
-                title="Generate new unique room"
-                className="interactive-hover"
-                style={{
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text-muted)',
-                  borderRadius: '8px',
-                  padding: '0 0.75rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  fontSize: '0.75rem',
-                  fontWeight: 600
-                }}
-              >
-                <Shuffle size={13} /> New
-              </button>
-              <button
-                onClick={() => setShowQR(!showQR)}
-                title="Scan QR Code to pair mobile phone"
-                className="interactive-hover"
-                style={{
-                  background: showQR ? '#06b6d4' : 'var(--bg-secondary)',
-                  color: showQR ? '#000000' : 'var(--text-main)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  padding: '0 0.85rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.3rem',
-                  fontSize: '0.75rem',
-                  fontWeight: 700
-                }}
-              >
-                <QrCode size={15} /> QR
-              </button>
-            </div>
-
-            {/* QR Code Card with Centered Robot Logo in the middle */}
-            {showQR && (
-              <div style={{
-                marginTop: '1rem',
-                background: '#ffffff',
-                padding: '1.25rem',
-                borderRadius: '12px',
-                display: 'inline-flex',
-                flexDirection: 'column',
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Your Room Channel
+            </span>
+            <button
+              onClick={() => setShowQR(!showQR)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-2)',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                display: 'flex',
                 alignItems: 'center',
-                gap: '0.65rem',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
-              }}>
-                <QRCodeSVG 
-                  value={roomUrl} 
-                  size={160}
-                  level="H"
-                  imageSettings={{
-                    src: '/logo.svg',
-                    x: undefined,
-                    y: undefined,
-                    height: 36,
-                    width: 36,
-                    excavate: true,
-                  }}
-                />
-                <span style={{ color: '#0f172a', fontSize: '0.75rem', fontWeight: 700 }}>
-                  Scan with phone camera to open room
-                </span>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.45rem' }}>
-              <p style={{ fontSize: '0.73rem', color: 'var(--text-subtle)' }}>
-                Tuned to: <code className="mono" style={{ color: '#06b6d4' }}>{room}</code>
-              </p>
-              {!savedStatus && (
-                <button 
-                  onClick={handleSaveRoom}
-                  style={{ background: 'none', border: 'none', color: '#60a5fa', fontSize: '0.73rem', cursor: 'pointer', textDecoration: 'underline' }}
-                >
-                  Save as default room
-                </button>
-              )}
-            </div>
+                gap: '0.25rem',
+                cursor: 'pointer'
+              }}
+            >
+              <QrCode size={14} /> {showQR ? 'Hide QR' : 'Pair Phone'}
+            </button>
           </div>
 
-          {/* Sound Profile & 1-Click Extension Setup */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <label style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <Volume1 size={14} color="#f59e0b" />
-                Acoustic Siren Profile
-              </label>
-            </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input 
+              type="text"
+              value={room}
+              onChange={e => updateRoom(e.target.value)}
+              placeholder="room-name"
+              style={{
+                flex: 1,
+                background: 'var(--surface-raised)',
+                border: '1px solid var(--border)',
+                borderRadius: '12px',
+                padding: '0.65rem 0.9rem',
+                color: '#ffffff',
+                fontSize: '0.95rem',
+                fontWeight: 600,
+                outline: 'none'
+              }}
+            />
+            <button
+              onClick={copyRoom}
+              style={{
+                background: 'var(--surface-raised)',
+                border: '1px solid var(--border)',
+                borderRadius: '12px',
+                padding: '0 1rem',
+                color: 'var(--text-1)',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                cursor: 'pointer'
+              }}
+            >
+              {isCopied ? <Check size={14} color="var(--accent-green)" /> : <Copy size={14} />}
+              {isCopied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
 
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
-              {(['siren', 'alarm', 'chime', 'beep'] as const).map(type => (
-                <button
-                  key={type}
-                  onClick={() => {
-                    setSoundType(type);
-                    if (isAudioEnabled) audioAlertEngine.playSound(type);
-                  }}
-                  className="interactive-hover"
-                  style={{
-                    padding: '0.35rem 0.75rem',
-                    borderRadius: '7px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    textTransform: 'capitalize',
-                    background: soundType === type ? '#f43f5e' : 'var(--bg-secondary)',
-                    color: soundType === type ? '#ffffff' : 'var(--text-muted)',
-                    border: `1px solid ${soundType === type ? '#f43f5e' : 'var(--border)'}`,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {type}
-                </button>
-              ))}
-              <button
-                onClick={() => setIsSpeechEnabled(!isSpeechEnabled)}
-                className="interactive-hover"
+          {/* Simple 1-sentence prompt for VS Code */}
+          <p style={{ fontSize: '0.76rem', color: 'var(--text-3)', marginTop: '0.75rem', lineHeight: '1.4' }}>
+            In VS Code or Antigravity, press <strong style={{ color: 'var(--text-2)' }}>Cmd+Shift+P</strong> &rarr; <strong style={{ color: 'var(--text-2)' }}>HeyHuman: Set Web Room ID</strong> &rarr; enter <code style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>{room}</code>.
+          </p>
+
+          {/* QR Code Modal Overlay */}
+          {showQR && (
+            <div style={{
+              marginTop: '1rem',
+              padding: '1.25rem',
+              background: '#ffffff',
+              borderRadius: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '0.75rem',
+              position: 'relative'
+            }}>
+              <button 
+                onClick={() => setShowQR(false)}
                 style={{
-                  padding: '0.35rem 0.75rem',
-                  borderRadius: '7px',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  background: isSpeechEnabled ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-secondary)',
-                  color: isSpeechEnabled ? '#60a5fa' : 'var(--text-muted)',
-                  border: `1px solid ${isSpeechEnabled ? 'rgba(59, 130, 246, 0.4)' : 'var(--border)'}`,
+                  position: 'absolute',
+                  top: '0.6rem',
+                  right: '0.6rem',
+                  background: 'none',
+                  border: 'none',
+                  color: '#000000',
                   cursor: 'pointer'
                 }}
               >
-                Voice Speech {isSpeechEnabled ? 'ON' : 'OFF'}
+                <X size={18} />
               </button>
+              <QRCodeSVG 
+                value={roomUrl} 
+                size={160}
+                level="H"
+                imageSettings={{
+                  src: '/logo.svg',
+                  x: undefined,
+                  y: undefined,
+                  height: 38,
+                  width: 38,
+                  excavate: true,
+                }}
+              />
+              <span style={{ color: '#090a0f', fontSize: '0.75rem', fontWeight: 600 }}>
+                Scan to open on your phone
+              </span>
             </div>
-
-            {/* Frictionless 1-Click Setup Box for Extension */}
-            <div style={{ 
-              background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(59, 130, 246, 0.08))', 
-              padding: '0.85rem', 
-              borderRadius: '9px', 
-              border: '1px solid rgba(6, 182, 212, 0.25)' 
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <Sparkles size={13} /> Pair with VS Code / Antigravity
-                </span>
-                <button
-                  onClick={copyRoomIdOnly}
-                  className="interactive-hover"
-                  style={{
-                    background: '#06b6d4',
-                    color: '#000000',
-                    border: 'none',
-                    borderRadius: '5px',
-                    padding: '0.2rem 0.55rem',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.25rem'
-                  }}
-                >
-                  {isSettingCopied ? <Check size={12} /> : <Copy size={12} />}
-                  {isSettingCopied ? 'Copied Room!' : 'Copy Room ID'}
-                </button>
-              </div>
-              <div style={{ fontSize: '0.76rem', color: 'var(--text-main)', lineHeight: '1.4' }}>
-                Press <code className="mono" style={{ color: '#ffffff', background: 'rgba(0,0,0,0.4)', padding: '0.1rem 0.35rem', borderRadius: '4px' }}>Cmd+Shift+P</code> in your IDE &rarr; choose <strong>HeyHuman: Set Web Room ID</strong> &rarr; paste <code className="mono" style={{ color: '#38bdf8', fontWeight: 700 }}>{room}</code>.
-              </div>
-            </div>
-          </div>
+          )}
         </section>
 
-        {/* Multi-Agent Support Bar */}
+        {/* 4. Sound Tone Selector */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '0.6rem',
-          padding: '0.85rem 1.1rem',
-          borderRadius: '11px',
-          background: 'rgba(18, 24, 36, 0.6)',
-          border: '1px solid var(--border)'
+          padding: '0.4rem 0.5rem'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-            <Layers size={16} color="#94a3b8" />
-            <span style={{ fontSize: '0.78rem', color: '#ffffff', fontWeight: 700 }}>
-              Autonomous Agents Monitored:
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
-            {[
-              { name: 'Google Antigravity', color: '#38bdf8' },
-              { name: 'GitHub Copilot', color: '#a78bfa' },
-              { name: 'Claude Code', color: '#fb923c' },
-              { name: 'Cursor Agent', color: '#34d399' },
-              { name: 'Aider AI', color: '#f472b6' }
-            ].map(agent => (
-              <span 
-                key={agent.name}
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-3)', fontWeight: 600 }}>Siren Tone</span>
+          <div style={{ display: 'flex', gap: '0.35rem' }}>
+            {(['siren', 'alarm', 'chime', 'beep'] as const).map(tone => (
+              <button
+                key={tone}
+                onClick={() => {
+                  setSoundType(tone);
+                  if (isAudioUnlocked) audioAlertEngine.playSound(tone);
+                }}
                 style={{
-                  fontSize: '0.72rem',
-                  fontWeight: 600,
-                  color: agent.color,
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border)',
-                  padding: '0.18rem 0.55rem',
-                  borderRadius: '999px'
+                  background: soundType === tone ? 'rgba(255, 255, 255, 0.12)' : 'none',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '0.25rem 0.55rem',
+                  fontSize: '0.75rem',
+                  fontWeight: soundType === tone ? 700 : 500,
+                  color: soundType === tone ? '#ffffff' : 'var(--text-3)',
+                  textTransform: 'capitalize',
+                  cursor: 'pointer'
                 }}
               >
-                ● {agent.name}
-              </span>
+                {tone}
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Incoming Alerts Feed */}
-        <section>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
-            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Bot size={17} color="#06b6d4" />
-              Live Permission Feed (Room: {room})
-            </h2>
-            {alerts.length > 0 && (
-              <button
-                onClick={handleClearAll}
-                className="interactive-hover"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-subtle)',
-                  fontSize: '0.75rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  cursor: 'pointer'
-                }}
+        {/* 5. Recent History (Only if alerts exist) */}
+        {alerts.length > 0 && (
+          <section>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', padding: '0 0.5rem' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-3)', fontWeight: 600 }}>Activity</span>
+              <button 
+                onClick={handleClear}
+                style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
               >
-                <Trash2 size={13} /> Clear Feed
+                <Trash2 size={11} /> Clear
               </button>
-            )}
-          </div>
-
-          {alerts.length === 0 ? (
-            <div className="glass-panel" style={{
-              borderRadius: '14px',
-              padding: '3rem 1.5rem',
-              textAlign: 'center',
-              border: '1px dashed var(--border)'
-            }}>
-              <Radio size={32} style={{ margin: '0 auto 0.75rem auto', opacity: 0.4, color: '#06b6d4' }} />
-              <p style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)' }}>
-                Listening on room <span className="mono" style={{ color: '#06b6d4' }}>{room}</span>
-              </p>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-subtle)', marginTop: '0.3rem', maxWidth: '420px', margin: '0.3rem auto 0 auto' }}>
-                Keep this tab open on your phone or tablet while away from your desk. You will hear an audible siren the moment any AI tool pauses for approval.
-              </p>
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {alerts.map(item => (
-                <div
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {alerts.slice(0, 5).map(item => (
+                <div 
                   key={item.id}
-                  className="glass-panel interactive-hover"
                   style={{
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
                     borderRadius: '12px',
-                    padding: '1.1rem 1.25rem',
+                    padding: '0.75rem 1rem',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    gap: '1rem',
-                    border: `1px solid ${item.resolved ? 'var(--border)' : '#f43f5e'}`,
-                    opacity: item.resolved ? 0.65 : 1
+                    opacity: item.resolved ? 0.5 : 1
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem' }}>
-                    <div style={{
-                      background: item.resolved ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.15)',
-                      color: item.resolved ? '#10b981' : '#f43f5e',
-                      borderRadius: '10px',
-                      padding: '0.55rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      {item.resolved ? <CheckCircle2 size={19} /> : <ShieldAlert size={19} />}
-                    </div>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#ffffff' }}>{item.agent}</span>
-                        {item.tool && (
-                          <span className="mono" style={{
-                            fontSize: '0.7rem',
-                            background: 'var(--bg-secondary)',
-                            color: '#38bdf8',
-                            padding: '0.12rem 0.45rem',
-                            borderRadius: '5px',
-                            border: '1px solid var(--border)'
-                          }}>
-                            {item.tool}
-                          </span>
-                        )}
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-subtle)' }}>
-                          {new Date(item.timestamp).toLocaleTimeString()}
-                        </span>
-                      </div>
-                      <p style={{ fontSize: '0.83rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
-                        {item.description}
-                      </p>
-                    </div>
+                  <div>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{item.agent}</span>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-2)', marginTop: '0.15rem' }}>
+                      {item.description}
+                    </p>
                   </div>
-
-                  {!item.resolved && (
-                    <button
-                      onClick={() => handleResolve(item.id)}
-                      className="interactive-hover"
-                      style={{
-                        background: 'rgba(16, 185, 129, 0.12)',
-                        color: '#10b981',
-                        border: '1px solid rgba(16, 185, 129, 0.35)',
-                        borderRadius: '7px',
-                        padding: '0.45rem 0.85rem',
-                        fontSize: '0.78rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        flexShrink: 0
-                      }}
-                    >
-                      Acknowledge
-                    </button>
-                  )}
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>
+                    {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
               ))}
             </div>
-          )}
-        </section>
+          </section>
+        )}
       </main>
 
-      {/* Footer with Attribution */}
+      {/* 6. Footer (Elegant, Simple Attribution) */}
       <footer style={{
-        marginTop: 'auto',
         textAlign: 'center',
-        padding: '2rem 1.25rem 1.5rem 1.25rem',
-        borderTop: '1px solid var(--border)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '0.4rem'
+        paddingTop: '2rem',
+        fontSize: '0.76rem',
+        color: 'var(--text-3)'
       }}>
-        <div style={{
-          fontSize: '0.8rem',
-          color: 'var(--text-muted)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.35rem',
-          flexWrap: 'wrap',
-          justifyContent: 'center'
-        }}>
-          <span>Designed & Engineered by</span>
-          <a 
-            href="https://portfolio.akdey.vercel.app/" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            style={{
-              color: '#ffffff',
-              fontWeight: 700,
-              textDecoration: 'none',
-              borderBottom: '1px dotted #38bdf8',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.25rem'
-            }}
-          >
-            AMIT KUMAR DEY
-            <ExternalLink size={12} color="#38bdf8" />
-          </a>
-        </div>
-        <p style={{ fontSize: '0.72rem', color: 'var(--text-subtle)' }}>
-          HeyHuman · Open Source AI Permission Siren & Mobile Alert System
-        </p>
+        Designed & Engineered by{' '}
+        <a 
+          href="https://portfolio.akdey.vercel.app/" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          style={{
+            color: 'var(--text-2)',
+            fontWeight: 600,
+            textDecoration: 'none',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.2rem'
+          }}
+        >
+          AMIT KUMAR DEY <ExternalLink size={11} />
+        </a>
       </footer>
     </div>
   );

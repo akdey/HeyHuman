@@ -1,21 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
 :root {
-  --bg-primary: #07090e;
-  --bg-secondary: #0d111a;
-  --bg-card: #121824;
-  --bg-card-hover: #161e2e;
-  --border: #1f293d;
-  --border-focus: #3b82f6;
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --text-subtle: #64748b;
-  --accent-red: #f43f5e;
-  --accent-red-glow: rgba(244, 63, 94, 0.35);
-  --accent-blue: #3b82f6;
-  --accent-cyan: #06b6d4;
-  --accent-emerald: #10b981;
-  --accent-amber: #f59e0b;
+  --bg: #090a0f;
+  --surface: #12141c;
+  --surface-raised: #181b26;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-active: rgba(255, 255, 255, 0.16);
+  --text-1: #ffffff;
+  --text-2: #9499ad;
+  --text-3: #585d73;
+  --accent-red: #ff3b30;
+  --accent-green: #34c759;
+  --accent-blue: #0071e3;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 }
 
 * {
@@ -25,86 +21,63 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-body {
-  background-color: var(--bg-primary);
-  color: var(--text-main);
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+html, body {
+  background-color: var(--bg);
+  color: var(--text-1);
+  font-family: var(--font-sans);
   min-height: 100vh;
   min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
   display: flex;
   flex-direction: column;
-  overflow-x: hidden;
-  letter-spacing: -0.01em;
-  background-image: 
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.12), transparent),
-    radial-gradient(circle at 100% 100%, rgba(244, 63, 94, 0.05), transparent);
-  background-attachment: fixed;
 }
 
-/* Subtle typography */
-code, pre, .mono {
-  font-family: 'JetBrains Mono', monospace;
+/* Subtle Apple-style tactile interaction */
+button, input {
+  font-family: inherit;
 }
 
-/* Custom scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: var(--bg-primary);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+button:active {
+  transform: scale(0.97);
+  transition: transform 80ms ease-out;
 }
 
-/* Animations */
-@keyframes sirenGlow {
-  0%, 100% {
-    box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.5), 0 0 30px rgba(244, 63, 94, 0.2);
-    border-color: #f43f5e;
+/* Single glowing radar pulse when waiting for AI */
+@keyframes radarPulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
   }
   50% {
-    box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.9), 0 0 60px rgba(244, 63, 94, 0.45);
-    border-color: #fb7185;
+    transform: scale(1.08);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.8;
   }
 }
 
-@keyframes subtleFlash {
+.radar-ring {
+  animation: radarPulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Emergency state: when agent is waiting */
+@keyframes alarmBeacon {
   0%, 100% {
-    background-color: transparent;
+    box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.4);
+    border-color: rgba(255, 59, 48, 0.6);
   }
   50% {
-    background-color: rgba(244, 63, 94, 0.06);
+    box-shadow: 0 0 40px 10px rgba(255, 59, 48, 0.35);
+    border-color: rgba(255, 59, 48, 1);
   }
 }
 
-.siren-active {
-  animation: sirenGlow 1.4s infinite ease-in-out;
-}
-
-.screen-flashing {
-  animation: subtleFlash 1.4s infinite ease-in-out;
-}
-
-/* Glass card styling */
-.glass-panel {
-  background: rgba(18, 24, 36, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.interactive-hover {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.interactive-hover:hover {
-  transform: translateY(-1px);
-}
-.interactive-hover:active {
-  transform: translateY(0);
+.alarm-active {
+  animation: alarmBeacon 1.2s infinite ease-in-out;
 }
