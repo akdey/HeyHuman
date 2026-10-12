@@ -76,11 +76,23 @@ export function App() {
   // Request Web Push Subscription
   const subscribeToWebPush = async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      alert('Web Push is not supported in this browser. On iPhone, make sure to add the app to Home Screen first!');
       return;
     }
 
     try {
+      let perm = Notification.permission;
+      if (perm !== 'granted') {
+        perm = await Notification.requestPermission();
+      }
+
+      if (perm !== 'granted') {
+        alert('Notification permission was not granted. Please allow notifications in your browser settings.');
+        return;
+      }
+
       const reg = await navigator.serviceWorker.ready;
+      
       // Get public VAPID key
       const res = await fetch(`/api/alert?room=${encodeURIComponent(room)}`);
       const data = await res.json();
@@ -88,13 +100,17 @@ export function App() {
 
       if (!vapidKey) return;
 
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidKey)
-      });
+      // Unsubscribe existing if needed or get active
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey)
+        });
+      }
 
-      // Send to server
-      await fetch(`/api/alert?room=${encodeURIComponent(room)}`, {
+      // Send subscription to server
+      const sendRes = await fetch(`/api/alert?room=${encodeURIComponent(room)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -103,9 +119,12 @@ export function App() {
         })
       });
 
-      setIsPushSubscribed(true);
-    } catch (e) {
+      if (sendRes.ok) {
+        setIsPushSubscribed(true);
+      }
+    } catch (e: any) {
       console.warn('Push subscription failed:', e);
+      alert(`Push activation error: ${e?.message || e}`);
     }
   };
 
