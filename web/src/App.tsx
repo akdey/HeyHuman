@@ -13,7 +13,6 @@ import {
   ExternalLink,
   Bell,
   BellOff,
-  Sun,
   Terminal,
   ArrowUpRight
 } from 'lucide-react';
@@ -56,8 +55,6 @@ export function App() {
   const [showQR, setShowQR] = useState<boolean>(false);
 
   const [isPushSubscribed, setIsPushSubscribed] = useState<boolean>(false);
-  const [isWakeLocked, setIsWakeLocked] = useState<boolean>(false);
-  const wakeLockRef = useRef<any>(null);
 
   const lastSeenIdRef = useRef<string | null>(null);
   const pollerRef = useRef<number | null>(null);
@@ -112,26 +109,7 @@ export function App() {
     }
   };
 
-  // Screen Wake Lock API (keeps mobile screen awake like a desk clock)
-  const toggleWakeLock = async () => {
-    if ('wakeLock' in navigator) {
-      try {
-        if (!isWakeLocked) {
-          wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
-          setIsWakeLocked(true);
-          wakeLockRef.current.addEventListener('release', () => {
-            setIsWakeLocked(false);
-          });
-        } else if (wakeLockRef.current) {
-          await wakeLockRef.current.release();
-          wakeLockRef.current = null;
-          setIsWakeLocked(false);
-        }
-      } catch (err) {
-        console.warn('Wake lock error:', err);
-      }
-    }
-  };
+
 
   // Save room on change & update URL
   const updateRoom = (newRoom: string) => {
@@ -354,29 +332,7 @@ export function App() {
             {isPushSubscribed ? 'Push Active' : 'Lock Alert'}
           </button>
 
-          {/* Screen Awake / Dock Pill (Keeps screen awake on desk) */}
-          {'wakeLock' in navigator && (
-            <button
-              onClick={toggleWakeLock}
-              title={isWakeLocked ? 'Screen Wake Lock Active (Screen stays on like a desk clock)' : 'Keep Screen On (Desk Dock Mode)'}
-              style={{
-                background: isWakeLocked ? 'rgba(255, 204, 0, 0.15)' : 'rgba(255, 255, 255, 0.06)',
-                border: `1px solid ${isWakeLocked ? 'rgba(255, 204, 0, 0.4)' : 'var(--border)'}`,
-                color: isWakeLocked ? '#ffcc00' : 'var(--text-3)',
-                borderRadius: '999px',
-                padding: '0.35rem 0.55rem',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-                cursor: 'pointer'
-              }}
-            >
-              <Sun size={13} />
-              {isWakeLocked ? 'Awake' : 'Stay On'}
-            </button>
-          )}
+
 
           {/* Audio State Pill */}
           <button

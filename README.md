@@ -47,7 +47,6 @@ You can connect your phone to your desktop in less than a minute — **zero mobi
 3. **Enable Audio & Lock Screen Alerts**:
    - Tap **"Tap for Sound"** once so your phone allows emergency sirens.
    - Tap **"Lock Alert"** (or approve the notification prompt) so HeyHuman registers cryptographic **Web Push** — this delivers native banners and vibration even when your phone is **locked and asleep in your pocket, with virtually zero battery drain**!
-   - *(Optional)*: Tap **"Stay On"** if you want your phone propped up on your desk without dimming.
 
 ---
 
