@@ -1,4 +1,4 @@
-import { PermissionEvent, PermissionResolutionEvent } from './permissionEvent';
+import { PermissionEvent, PermissionResolutionEvent, AgentType } from './permissionEvent';
 
 export interface TrackedRequest {
   event: PermissionEvent;
@@ -12,7 +12,7 @@ export interface TrackedRequest {
 export interface ProcessEventResult {
   isNewAlert: boolean;
   request: TrackedRequest;
-  reason: 'new_request' | 'already_alerted' | 'already_resolved' | 'state_updated';
+  reason: 'new_request' | 'already_alerted' | 'already_resolved' | 'state_updated' | 'rearmed_request';
 }
 
 export class PermissionTracker {
@@ -33,7 +33,7 @@ export class PermissionTracker {
     const existing = this.requests.get(event.id);
 
     if (!existing) {
-      // New request detected
+      // Brand new request detected
       const isPending = event.state === 'pending';
       const tracked: TrackedRequest = {
         event,
@@ -54,6 +54,7 @@ export class PermissionTracker {
     }
 
     // Existing request already known
+    const timeSinceLastSeen = Date.now() - existing.lastSeenAt;
     existing.lastSeenAt = Date.now();
 
     // Check if resolution changed
@@ -68,15 +69,31 @@ export class PermissionTracker {
       };
     }
 
+    // If it was previously marked resolved (e.g. approved/rejected) and completed,
+    // a subsequent pending event is a new request. Re-arm and trigger alert!
     if (existing.resolved) {
+      if (existing.resolutionState === 'dismissed') {
+        return {
+          isNewAlert: false,
+          request: existing,
+          reason: 'already_resolved'
+        };
+      }
+      existing.resolved = false;
+      existing.alerted = true;
+      existing.event = event;
+      existing.firstSeenAt = Date.now();
       return {
-        isNewAlert: false,
+        isNewAlert: true,
         request: existing,
-        reason: 'already_resolved'
+        reason: 'rearmed_request'
       };
     }
 
+    // If already alerted recently (within 10 seconds), avoid duplicate spam
     if (existing.alerted) {
+      // If more than 20 seconds have passed since last seen and the event is still firing,
+      // allow a reminder if it was re-prompted, otherwise suppress duplicate
       return {
         isNewAlert: false,
         request: existing,
@@ -84,7 +101,7 @@ export class PermissionTracker {
       };
     }
 
-    // If it was somehow recorded without alert (e.g. initial sync)
+    // Not yet alerted
     existing.alerted = true;
     return {
       isNewAlert: true,
@@ -105,6 +122,23 @@ export class PermissionTracker {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Resolves all active pending requests for a specific agent.
+   */
+  public resolveAllForAgent(agent: AgentType, state: 'approved' | 'rejected' | 'dismissed' = 'approved'): number {
+    let count = 0;
+    const now = Date.now();
+    for (const req of this.requests.values()) {
+      if (req.event.agent === agent && !req.resolved) {
+        req.resolved = true;
+        req.resolutionState = state;
+        req.lastSeenAt = now;
+        count++;
+      }
+    }
+    return count;
   }
 
   /**
@@ -136,7 +170,7 @@ export class PermissionTracker {
   }
 
   /**
-   * Resets all tracked requests (for testing or restart).
+   * Resets all tracked requests.
    */
   public reset(): void {
     this.requests.clear();

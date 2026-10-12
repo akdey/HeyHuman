@@ -22,6 +22,8 @@ export class CopilotDetector implements IAgentDetector {
   private pollTimer: NodeJS.Timeout | null = null;
   private watchedFiles = new Set<string>();
   private fileOffsets = new Map<string, number>();
+  private activePendingIds = new Set<string>();
+  private eventSequence = 0;
   private isRunning = false;
   private statusInfo: DetectorStatusInfo = {
     status: 'idle',
@@ -40,7 +42,6 @@ export class CopilotDetector implements IAgentDetector {
     }
     this.isRunning = true;
 
-    // Check if GitHub Copilot is installed
     const copilotInstalled = this.isCopilotInstalled();
     if (!copilotInstalled) {
       this.statusInfo = {
@@ -56,12 +57,13 @@ export class CopilotDetector implements IAgentDetector {
 
     this.scanAndWatchTargets();
 
-    // Periodic discovery for new session logs / transcripts (every 4 seconds)
+    // Periodic discovery + active polling (every 1000ms)
     this.pollTimer = setInterval(() => {
       if (this.isRunning) {
         this.scanAndWatchTargets();
+        this.pollAllWatchedFiles();
       }
-    }, 4000);
+    }, 1000);
   }
 
   public stop(): void {
@@ -80,6 +82,7 @@ export class CopilotDetector implements IAgentDetector {
     this.fileWatchers = [];
     this.watchedFiles.clear();
     this.fileOffsets.clear();
+    this.activePendingIds.clear();
     this.statusInfo = {
       status: 'idle',
       message: 'Stopped'
@@ -99,9 +102,6 @@ export class CopilotDetector implements IAgentDetector {
     );
   }
 
-  /**
-   * Discovers and attaches file watchers to Copilot logs and transcripts.
-   */
   private scanAndWatchTargets(): void {
     const candidates = this.getCandidateLogPaths();
     let anyActive = false;
@@ -126,7 +126,7 @@ export class CopilotDetector implements IAgentDetector {
           this.watchSingleFile(targetPath);
           anyActive = true;
         }
-      } catch (err) {
+      } catch {
         // Skip unreadable files
       }
     }
@@ -148,17 +148,14 @@ export class CopilotDetector implements IAgentDetector {
   private getCandidateLogPaths(): string[] {
     const paths: string[] = [];
 
-    // 1. Custom user path if set
     const custom = this.settings.getCopilotCustomLogPath();
     if (custom) {
       paths.push(custom);
     }
 
-    // 2. ~/.copilot/logs
     const homeCopilotLogs = path.join(os.homedir(), '.copilot', 'logs');
     paths.push(homeCopilotLogs);
 
-    // 3. Workspace storage folder if available
     try {
       if (this.context.storageUri?.fsPath) {
         const parentStorage = path.dirname(this.context.storageUri.fsPath);
@@ -170,7 +167,6 @@ export class CopilotDetector implements IAgentDetector {
       // Ignore
     }
 
-    // 4. Standard OS VS Code workspaceStorage location
     const appData = process.platform === 'darwin'
       ? path.join(os.homedir(), 'Library', 'Application Support', 'Code', 'User', 'workspaceStorage')
       : process.platform === 'win32'
@@ -191,14 +187,11 @@ export class CopilotDetector implements IAgentDetector {
 
     try {
       const stats = fs.statSync(filePath);
-      // Start reading from current end to avoid retroactively alerting past requests
       this.fileOffsets.set(filePath, stats.size);
       this.watchedFiles.add(filePath);
 
-      const watcher = fs.watch(filePath, (eventType) => {
-        if (eventType === 'change') {
-          this.readNewContent(filePath);
-        }
+      const watcher = fs.watch(filePath, () => {
+        this.readNewContent(filePath);
       });
 
       watcher.on('error', () => {
@@ -207,7 +200,13 @@ export class CopilotDetector implements IAgentDetector {
 
       this.fileWatchers.push(watcher);
     } catch {
-      // File could be locked or transient
+      // File could be transient
+    }
+  }
+
+  private pollAllWatchedFiles(): void {
+    for (const filePath of this.watchedFiles) {
+      this.readNewContent(filePath);
     }
   }
 
@@ -220,8 +219,7 @@ export class CopilotDetector implements IAgentDetector {
       const prevOffset = this.fileOffsets.get(filePath) || 0;
 
       if (stats.size < prevOffset) {
-        // File truncated/restarted
-        this.fileOffsets.set(filePath, stats.size);
+        this.fileOffsets.set(filePath, 0);
         return;
       }
 
@@ -243,9 +241,6 @@ export class CopilotDetector implements IAgentDetector {
     }
   }
 
-  /**
-   * Inspects new text lines for permission / confirmation signatures.
-   */
   public analyzeLogChunk(chunk: string, sourcePath: string): void {
     const lines = chunk.split('\n');
     for (const rawLine of lines) {
@@ -254,7 +249,6 @@ export class CopilotDetector implements IAgentDetector {
         continue;
       }
 
-      // Check for approval / confirmation requests
       const isApprovalRequest =
         /confirmation\s*(required|requested)|waiting\s+for\s+(user\s+)?confirmation|permission\s*(required|prompt)|prompt.*approval|approval.*pending|needs\s+permission|prepareInvocation.*confirm/i.test(line);
 
@@ -262,16 +256,19 @@ export class CopilotDetector implements IAgentDetector {
         /confirmation\s*(approved|granted|denied|rejected|canceled|cancelled)|user\s+(approved|rejected|allowed|denied)/i.test(line);
 
       if (isApprovalRequest && !isResolution) {
-        // Extract command or tool details if available
         let summary = 'Command or tool execution requires confirmation';
         const cmdMatch = line.match(/(?:command|tool|action|execute)\s*[:=]\s*["']?([^"'\n\r]+)["']?/i);
         if (cmdMatch && cmdMatch[1]) {
           summary = `Approve action: ${cmdMatch[1].trim()}`;
         }
 
-        const idHash = crypto.createHash('sha256').update(`${sourcePath}:${line}`).digest('hex').slice(0, 16);
+        this.eventSequence++;
+        const idHash = crypto.createHash('sha256').update(`${sourcePath}:${line}:${this.eventSequence}`).digest('hex').slice(0, 12);
+        const eventId = `copilot-${idHash}`;
+        this.activePendingIds.add(eventId);
+
         const event: PermissionEvent = {
-          id: `copilot-${idHash}`,
+          id: eventId,
           agent: 'copilot',
           type: line.toLowerCase().includes('terminal') ? 'terminal_command' : 'tool_execution',
           state: 'pending',
@@ -283,13 +280,26 @@ export class CopilotDetector implements IAgentDetector {
 
         this.permissionDetectedEmitter.fire(event);
       } else if (isResolution) {
-        const idHash = crypto.createHash('sha256').update(`${sourcePath}:${line}`).digest('hex').slice(0, 16);
-        this.permissionResolvedEmitter.fire({
-          id: `copilot-${idHash}`,
-          agent: 'copilot'
-        });
+        this.resolveAllPending();
       }
     }
+  }
+
+  private resolveAllPending(): void {
+    if (this.activePendingIds.size === 0) {
+      this.permissionResolvedEmitter.fire({
+        id: 'copilot-all',
+        agent: 'copilot'
+      });
+      return;
+    }
+    for (const pendingId of this.activePendingIds) {
+      this.permissionResolvedEmitter.fire({
+        id: pendingId,
+        agent: 'copilot'
+      });
+    }
+    this.activePendingIds.clear();
   }
 
   public dispose(): void {

@@ -37,6 +37,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     dispose: () => alertManager.dispose()
   });
 
+  const outputChannel = vscode.window.createOutputChannel('HeyHuman');
+  context.subscriptions.push(outputChannel);
+  outputChannel.appendLine('[HeyHuman] Output channel initialized.');
+
   // 2. Initialize Permission Tracker
   const tracker = new PermissionTracker();
 
@@ -50,25 +54,29 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // Permission detection pipeline
     detector.onPermissionDetected(async (event) => {
-      console.log(`[HeyHuman] Event detected from ${event.agent}:`, event.summary);
+      outputChannel.appendLine(`[HeyHuman] Event detected from ${event.agent}: ${event.summary} (ID: ${event.id})`);
       const result = tracker.processEvent(event);
       if (result.isNewAlert) {
-        console.log(`[HeyHuman] Triggering alert for new request ID: ${event.id}`);
+        outputChannel.appendLine(`[HeyHuman] 🔊 Triggering alert for request ID: ${event.id}`);
         await alertManager.triggerAlert(event);
       } else {
-        console.log(`[HeyHuman] Suppressed alert (${result.reason}) for request ID: ${event.id}`);
+        outputChannel.appendLine(`[HeyHuman] Suppressed alert (${result.reason}) for request ID: ${event.id}`);
       }
     });
 
     // Permission resolution pipeline
     detector.onPermissionResolved((res) => {
-      console.log(`[HeyHuman] Request resolved: ${res.id}`);
-      tracker.resolveRequest({
-        id: res.id,
-        agent: res.agent,
-        state: 'approved',
-        timestamp: Date.now()
-      });
+      outputChannel.appendLine(`[HeyHuman] Request resolved: ${res.id}`);
+      if (res.id.includes('all')) {
+        tracker.resolveAllForAgent(res.agent);
+      } else {
+        tracker.resolveRequest({
+          id: res.id,
+          agent: res.agent,
+          state: 'approved',
+          timestamp: Date.now()
+        });
+      }
     });
 
     // Start detector

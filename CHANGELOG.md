@@ -2,6 +2,15 @@
 
 All notable changes to the "heyhuman" extension will be documented in this file.
 
+## [1.0.1] - 2026-10-12
+
+### Fixed
+- **Subsequent Alert Delivery**: Fixed lifecycle state machine in `PermissionTracker` that prevented subsequent alerts from firing after a request was marked resolved or approved.
+- **Continuous File Polling**: Added 1000ms proactive polling across all active log and transcript targets to prevent missed events on macOS/Linux where native `fs.watch` event hooks drop on atomic writes.
+- **Unified Resolution IDs**: Fixed ID mismatch between prompt detectors and resolution events so pending state reliably clears when the user acts.
+- **Audio Process Timeout**: Added `-t 4` flag to macOS `afplay` invocation to prevent audio player locks.
+- **Real-Time Output Channel**: Added dedicated `HeyHuman` output channel in VS Code for live event tracing.
+
 ## [1.0.0] - 2026-10-12
 
 ### Initial Release

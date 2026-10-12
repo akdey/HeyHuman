@@ -25,6 +25,7 @@ export class AntigravityDetector implements IAgentDetector {
   private fileOffsets = new Map<string, number>();
   private pollTimer: NodeJS.Timeout | null = null;
   private companionServer: http.Server | null = null;
+  private activePendingIds = new Set<string>();
 
   private statusInfo: DetectorStatusInfo = {
     status: 'idle',
@@ -43,12 +44,13 @@ export class AntigravityDetector implements IAgentDetector {
     // 2. Discover and monitor Antigravity brain transcripts
     this.scanAndWatchTranscripts();
 
-    // 3. Periodic conversation discovery (every 3 seconds)
+    // 3. Robust polling timer (every 1000ms): scans directories AND polls all watched files for updates
     this.pollTimer = setInterval(() => {
       if (this.isRunning) {
         this.scanAndWatchTranscripts();
+        this.pollAllWatchedFiles();
       }
-    }, 3000);
+    }, 1000);
   }
 
   public stop(): void {
@@ -67,6 +69,7 @@ export class AntigravityDetector implements IAgentDetector {
     this.fileWatchers = [];
     this.watchedFiles.clear();
     this.fileOffsets.clear();
+    this.activePendingIds.clear();
 
     if (this.companionServer) {
       try {
@@ -111,8 +114,11 @@ export class AntigravityDetector implements IAgentDetector {
           req.on('end', () => {
             try {
               const data = JSON.parse(body);
+              const eventId = data.id || `ag-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+              this.activePendingIds.add(eventId);
+
               const event: PermissionEvent = {
-                id: data.id || `ag-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                id: eventId,
                 agent: 'antigravity',
                 type: data.type || 'confirmation_dialog',
                 state: 'pending',
@@ -141,10 +147,13 @@ export class AntigravityDetector implements IAgentDetector {
             try {
               const data = JSON.parse(body);
               if (data.id) {
+                this.activePendingIds.delete(data.id);
                 this.permissionResolvedEmitter.fire({
                   id: data.id,
                   agent: 'antigravity'
                 });
+              } else {
+                this.resolveAllPending();
               }
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ success: true }));
@@ -200,7 +209,7 @@ export class AntigravityDetector implements IAgentDetector {
             }
           }
         }
-      } catch (err) {
+      } catch {
         // Path might be restricted
       }
     }
@@ -211,7 +220,6 @@ export class AntigravityDetector implements IAgentDetector {
         message: `Actively watching ${this.watchedFiles.size} Antigravity transcript(s) & companion port ${this.settings.getAntigravityCompanionPort()}`
       };
     } else {
-      // Check if Antigravity is installed on machine
       const isAntigravityInstalled =
         fs.existsSync('/Applications/Antigravity IDE.app') ||
         fs.existsSync('/Applications/Antigravity.app') ||
@@ -220,8 +228,8 @@ export class AntigravityDetector implements IAgentDetector {
       this.statusInfo = {
         status: isAntigravityInstalled ? 'idle' : 'warning',
         message: isAntigravityInstalled
-          ? `Antigravity detected (companion receiver active on port ${this.settings.getAntigravityCompanionPort()}; no active conversations currently running)`
-          : 'Google Antigravity not found in default paths. You can specify a custom path in settings.'
+          ? `Antigravity detected (companion port ${this.settings.getAntigravityCompanionPort()}; waiting for conversation)`
+          : 'Google Antigravity not found in default paths. Configure a custom path in settings.'
       };
     }
   }
@@ -229,13 +237,11 @@ export class AntigravityDetector implements IAgentDetector {
   private getBrainDirectories(): string[] {
     const list: string[] = [];
 
-    // Custom path if configured
     const custom = this.settings.getAntigravityCustomLogPath();
     if (custom) {
       list.push(custom);
     }
 
-    // Default ~/.gemini/antigravity/brain
     const defaultBrain = path.join(os.homedir(), '.gemini', 'antigravity', 'brain');
     list.push(defaultBrain);
 
@@ -252,10 +258,8 @@ export class AntigravityDetector implements IAgentDetector {
       this.fileOffsets.set(filePath, stats.size);
       this.watchedFiles.add(filePath);
 
-      const watcher = fs.watch(filePath, (eventType) => {
-        if (eventType === 'change') {
-          this.readNewTranscriptLines(filePath);
-        }
+      const watcher = fs.watch(filePath, () => {
+        this.readNewTranscriptLines(filePath);
       });
 
       watcher.on('error', () => {
@@ -268,6 +272,15 @@ export class AntigravityDetector implements IAgentDetector {
     }
   }
 
+  /**
+   * Proactively polls all watched files to avoid missing events if fs.watch drops on macOS.
+   */
+  private pollAllWatchedFiles(): void {
+    for (const filePath of this.watchedFiles) {
+      this.readNewTranscriptLines(filePath);
+    }
+  }
+
   private readNewTranscriptLines(filePath: string): void {
     try {
       if (!fs.existsSync(filePath)) {
@@ -277,7 +290,8 @@ export class AntigravityDetector implements IAgentDetector {
       const prevOffset = this.fileOffsets.get(filePath) || 0;
 
       if (stats.size < prevOffset) {
-        this.fileOffsets.set(filePath, stats.size);
+        // File was truncated or restarted
+        this.fileOffsets.set(filePath, 0);
         return;
       }
 
@@ -299,9 +313,6 @@ export class AntigravityDetector implements IAgentDetector {
     }
   }
 
-  /**
-   * Parses new JSONL entries from Antigravity transcript.
-   */
   public parseTranscriptChunk(chunk: string, sourcePath: string): void {
     const lines = chunk.split('\n');
     for (const rawLine of lines) {
@@ -319,9 +330,6 @@ export class AntigravityDetector implements IAgentDetector {
     }
   }
 
-  /**
-   * Evaluates a single Antigravity conversation step.
-   */
   public evaluateStep(step: any, sourcePath: string): void {
     const stepIndex = step.step_index ?? 0;
     const stepStatus = String(step.status || '').toUpperCase();
@@ -335,7 +343,9 @@ export class AntigravityDetector implements IAgentDetector {
         ? questionData.slice(0, 80)
         : 'User clarification requested';
 
-      const id = `ag-q-${stepIndex}-${crypto.createHash('md5').update(JSON.stringify(askQuestionCall)).digest('hex').slice(0, 8)}`;
+      const id = `ag-step-${stepIndex}-q`;
+      this.activePendingIds.add(id);
+
       const event: PermissionEvent = {
         id,
         agent: 'antigravity',
@@ -359,7 +369,9 @@ export class AntigravityDetector implements IAgentDetector {
       const cmd = bypassCall.args?.CommandLine || 'terminal command';
       const cleanCmd = String(cmd).replace(/^"|"$/g, '').slice(0, 80);
 
-      const id = `ag-bypass-${stepIndex}-${crypto.createHash('md5').update(cleanCmd).digest('hex').slice(0, 8)}`;
+      const id = `ag-step-${stepIndex}-bypass`;
+      this.activePendingIds.add(id);
+
       const event: PermissionEvent = {
         id,
         agent: 'antigravity',
@@ -377,7 +389,9 @@ export class AntigravityDetector implements IAgentDetector {
 
     // 3. Step status check (waiting for input/permission)
     if (stepStatus.includes('WAITING') || stepStatus.includes('PERMISSION') || stepStatus === 'WAITING_FOR_INPUT') {
-      const id = `ag-step-${stepIndex}`;
+      const id = `ag-step-${stepIndex}-waiting`;
+      this.activePendingIds.add(id);
+
       const event: PermissionEvent = {
         id,
         agent: 'antigravity',
@@ -394,12 +408,25 @@ export class AntigravityDetector implements IAgentDetector {
 
     // 4. Resolution check: If step is completed or user explicit input occurred
     if (step.source === 'USER_EXPLICIT' || step.source === 'USER_INPUT' || stepStatus === 'DONE') {
-      const id = `ag-step-${stepIndex}`;
+      this.resolveAllPending();
+    }
+  }
+
+  private resolveAllPending(): void {
+    if (this.activePendingIds.size === 0) {
       this.permissionResolvedEmitter.fire({
-        id,
+        id: 'ag-all',
+        agent: 'antigravity'
+      });
+      return;
+    }
+    for (const pendingId of this.activePendingIds) {
+      this.permissionResolvedEmitter.fire({
+        id: pendingId,
         agent: 'antigravity'
       });
     }
+    this.activePendingIds.clear();
   }
 
   public dispose(): void {

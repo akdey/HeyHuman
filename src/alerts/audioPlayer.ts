@@ -69,7 +69,7 @@ export class AudioPlayer {
         if (platform === 'darwin') {
           // macOS: afplay with -v (0.0 to 1.0 or higher)
           const afplayVol = (normalizedVol / 100).toFixed(2);
-          proc = spawn('/usr/bin/afplay', ['-v', afplayVol, soundPath], {
+          proc = spawn('/usr/bin/afplay', ['-v', afplayVol, '-t', '4', soundPath], {
             stdio: 'ignore'
           });
         } else if (platform === 'win32') {
