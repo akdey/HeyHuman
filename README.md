@@ -1,6 +1,8 @@
-# HeyHuman 🚨
-
 <div align="center">
+
+<img src="./media/logo.png" alt="HeyHuman Logo" width="160" />
+
+<h1>HeyHuman</h1>
 
 <h3>Your AI is waiting. Permission required.</h3>
 
