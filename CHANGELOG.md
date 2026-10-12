@@ -2,6 +2,11 @@
 
 All notable changes to the "heyhuman" extension will be documented in this file.
 
+## [1.1.2] - 2026-10-12
+
+### Added
+- **Official Branding**: Added high-resolution sarcastic robot logo and icon assets to the extension manifest and documentation for Marketplace rendering.
+
 ## [1.1.1] - 2026-10-12
 
 ### Fixed
