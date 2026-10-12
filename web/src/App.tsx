@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
-  Bell, 
   Volume2, 
   VolumeX, 
   Radio, 
@@ -13,7 +12,9 @@ import {
   Smartphone,
   Bot,
   QrCode,
-  Shuffle
+  Shuffle,
+  Volume1,
+  ExternalLink
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -29,8 +30,8 @@ interface AlertItem {
   resolved?: boolean;
 }
 
-const RANDOM_ADJECTIVES = ['fast', 'clever', 'swift', 'hyper', 'crypto', 'silent', 'wild', 'super'];
-const RANDOM_NOUNS = ['lynx', 'falcon', 'tiger', 'robot', 'badger', 'panther', 'viper', 'matrix'];
+const RANDOM_ADJECTIVES = ['hyper', 'swift', 'zero', 'cyber', 'silent', 'delta', 'vivid', 'quantum'];
+const RANDOM_NOUNS = ['lynx', 'falcon', 'matrix', 'beacon', 'badger', 'panther', 'nexus', 'pulse'];
 
 function generateRandomRoom(): string {
   const adj = RANDOM_ADJECTIVES[Math.floor(Math.random() * RANDOM_ADJECTIVES.length)];
@@ -41,7 +42,7 @@ function generateRandomRoom(): string {
 
 export function App() {
   const searchParams = new URLSearchParams(window.location.search);
-  const initialRoom = searchParams.get('room') || 'my-room';
+  const initialRoom = searchParams.get('room') || 'my-workspace';
 
   const [room, setRoom] = useState<string>(initialRoom);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
@@ -123,7 +124,7 @@ export function App() {
       if (isSpeechEnabled) {
         setTimeout(() => {
           audioAlertEngine.speak(`Hey human! ${item.agent} is asking for your permission!`);
-        }, 800);
+        }, 850);
       }
     }
 
@@ -133,7 +134,7 @@ export function App() {
 
     if ('Notification' in window && Notification.permission === 'granted') {
       try {
-        new Notification(`🚨 HeyHuman: ${item.agent}`, {
+        new Notification(`HeyHuman · ${item.agent}`, {
           body: item.description || `Approval required: ${item.tool || 'Action'}`,
           icon: '/logo.png',
           tag: item.id
@@ -178,14 +179,15 @@ export function App() {
       setAlerts(prev => [testItem, ...prev]);
     }
 
-    setTimeout(() => setIsTesting(false), 1500);
+    setTimeout(() => setIsTesting(false), 1400);
   };
 
   const handleResolve = async (id: string) => {
     confetti({
-      particleCount: 40,
-      spread: 60,
-      origin: { y: 0.7 }
+      particleCount: 50,
+      spread: 70,
+      origin: { y: 0.65 },
+      colors: ['#f43f5e', '#3b82f6', '#10b981', '#ffffff']
     });
 
     setAlerts(prev => prev.map(a => a.id === id ? { ...a, resolved: true } : a));
@@ -234,335 +236,200 @@ export function App() {
   };
 
   return (
-    <div className={`min-h-screen flex flex-col ${isFlashing ? 'screen-flashing' : ''}`} style={{ paddingBottom: '3rem' }}>
-      {/* Audio Unlock Notification Bar for Mobile Devices */}
+    <div className={`min-h-screen flex flex-col ${isFlashing ? 'screen-flashing' : ''}`} style={{ paddingBottom: '3.5rem' }}>
+      
+      {/* Mobile Audio Activation Bar */}
       {!isAudioEnabled && (
         <div style={{
-          backgroundColor: '#3b82f6',
-          color: '#ffffff',
-          padding: '0.75rem 1rem',
+          backgroundColor: '#1d283a',
+          borderBottom: '1px solid rgba(59, 130, 246, 0.3)',
+          color: '#e2e8f0',
+          padding: '0.65rem 1rem',
           textAlign: 'center',
-          fontSize: '0.9rem',
+          fontSize: '0.85rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '0.75rem',
-          fontWeight: 500,
-          boxShadow: '0 2px 10px rgba(59, 130, 246, 0.4)'
+          gap: '0.85rem',
+          fontWeight: 500
         }}>
-          <Smartphone size={18} />
-          <span>Tap to activate audio sirens and speech synthesis on your phone!</span>
+          <Smartphone size={16} color="#60a5fa" />
+          <span>Tap to unlock audio sirens and voice speech on this device</span>
           <button 
             onClick={enableAudio}
+            className="interactive-hover"
             style={{
-              background: '#ffffff',
-              color: '#1d4ed8',
+              background: '#3b82f6',
+              color: '#ffffff',
               border: 'none',
               borderRadius: '6px',
-              padding: '0.25rem 0.75rem',
+              padding: '0.3rem 0.85rem',
               fontWeight: 600,
+              fontSize: '0.8rem',
               cursor: 'pointer'
             }}
           >
-            Activate Sound
+            Enable Sound
           </button>
         </div>
       )}
 
-      {/* Main Header */}
+      {/* Main App Navigation */}
       <header style={{
-        padding: '1.25rem 1rem',
+        padding: '1.1rem 1.25rem',
         borderBottom: '1px solid var(--border)',
-        backgroundColor: 'var(--bg-secondary)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        maxWidth: '1000px',
-        margin: '0 auto',
-        width: '100%'
+        backgroundColor: 'rgba(13, 17, 26, 0.85)',
+        backdropFilter: 'blur(16px)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 50
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <img src="/logo.svg" alt="HeyHuman Logo" style={{ width: '40px', height: '40px' }} />
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <h1 style={{ fontSize: '1.25rem', fontWeight: 700, letterSpacing: '-0.02em' }}>HeyHuman</h1>
-              <span style={{
-                background: 'rgba(239, 68, 68, 0.15)',
-                color: '#ef4444',
-                fontSize: '0.7rem',
-                fontWeight: 700,
-                padding: '0.15rem 0.5rem',
-                borderRadius: '999px',
-                border: '1px solid rgba(239, 68, 68, 0.3)'
-              }}>
-                WEB & PWA
-              </span>
+        <div style={{
+          maxWidth: '1020px',
+          margin: '0 auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem'
+        }}>
+          {/* Brand */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+            <div style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.15), rgba(59, 130, 246, 0.15))',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <img src="/logo.svg" alt="HeyHuman Logo" style={{ width: '26px', height: '26px' }} />
             </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Phone siren & push alerts when your AI is blocked waiting for you
-            </p>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.03em', color: '#ffffff' }}>HeyHuman</span>
+                <span style={{
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  background: 'rgba(244, 63, 94, 0.12)',
+                  color: '#f43f5e',
+                  border: '1px solid rgba(244, 63, 94, 0.25)',
+                  padding: '0.12rem 0.45rem',
+                  borderRadius: '6px'
+                }}>
+                  RELAY
+                </span>
+              </div>
+              <p style={{ fontSize: '0.73rem', color: 'var(--text-subtle)', fontWeight: 500 }}>
+                Audible siren when your autonomous AI agent needs your approval
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            onClick={() => setIsAudioEnabled(!isAudioEnabled)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              padding: '0.4rem 0.75rem',
-              background: isAudioEnabled ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-              color: isAudioEnabled ? '#10b981' : '#ef4444',
-              border: `1px solid ${isAudioEnabled ? '#10b981' : '#ef4444'}`,
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '0.8rem',
-              fontWeight: 600
-            }}
-          >
-            {isAudioEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-            {isAudioEnabled ? 'Sound Active' : 'Sound Muted'}
-          </button>
+          {/* Quick Header Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              onClick={() => setIsAudioEnabled(!isAudioEnabled)}
+              className="interactive-hover"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.45rem 0.8rem',
+                background: isAudioEnabled ? 'rgba(16, 185, 129, 0.1)' : 'rgba(244, 63, 94, 0.1)',
+                color: isAudioEnabled ? '#10b981' : '#f43f5e',
+                border: `1px solid ${isAudioEnabled ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)'}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '0.8rem',
+                fontWeight: 600
+              }}
+            >
+              {isAudioEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+              {isAudioEnabled ? 'Audio Live' : 'Muted'}
+            </button>
 
-          <button
-            onClick={handleTestAlert}
-            disabled={isTesting}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              padding: '0.4rem 0.85rem',
-              background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)'
-            }}
-          >
-            <ShieldAlert size={16} />
-            Test Siren
-          </button>
+            <button
+              onClick={handleTestAlert}
+              disabled={isTesting}
+              className="interactive-hover"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.45rem 0.95rem',
+                background: 'linear-gradient(135deg, #f43f5e, #e11d48)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                boxShadow: '0 4px 14px rgba(244, 63, 94, 0.3)'
+              }}
+            >
+              <ShieldAlert size={15} />
+              Test Siren
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Main Container */}
+      {/* Main Content Area */}
       <main style={{
-        maxWidth: '1000px',
+        maxWidth: '1020px',
         margin: '0 auto',
         width: '100%',
-        padding: '1.25rem 1rem',
+        padding: '1.5rem 1.25rem',
         display: 'flex',
         flexDirection: 'column',
         gap: '1.5rem'
       }}>
-        {/* Multi-User Room Pairing Section */}
-        <section style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border)',
-          borderRadius: '12px',
-          padding: '1.25rem',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '1.25rem'
-        }}>
-          {/* Room Selection */}
-          <div>
-            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.4rem' }}>
-              <Radio size={14} color="#06b6d4" />
-              Your Multi-User Room ID
-            </label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <input 
-                type="text"
-                value={room}
-                onChange={e => handleRoomChange(e.target.value)}
-                placeholder="e.g. akdey"
-                style={{
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text-main)',
-                  padding: '0.55rem 0.75rem',
-                  borderRadius: '8px',
-                  fontSize: '0.95rem',
-                  fontWeight: 600,
-                  flex: 1
-                }}
-              />
-              <button
-                onClick={handleRandomRoom}
-                title="Generate random room"
-                style={{
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border)',
-                  color: 'var(--text-main)',
-                  borderRadius: '8px',
-                  padding: '0 0.75rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  fontSize: '0.8rem'
-                }}
-              >
-                <Shuffle size={14} /> New
-              </button>
-              <button
-                onClick={() => setShowQR(!showQR)}
-                title="Scan QR Code to open on mobile"
-                style={{
-                  background: showQR ? '#06b6d4' : 'var(--bg-secondary)',
-                  color: showQR ? '#000000' : 'var(--text-main)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  padding: '0 0.75rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  fontSize: '0.8rem',
-                  fontWeight: 600
-                }}
-              >
-                <QrCode size={16} /> QR
-              </button>
-            </div>
-
-            {/* QR Code Popover */}
-            {showQR && (
-              <div style={{
-                marginTop: '1rem',
-                background: '#ffffff',
-                padding: '1rem',
-                borderRadius: '8px',
-                display: 'inline-flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '0.5rem'
-              }}>
-                <QRCodeSVG value={roomUrl} size={160} />
-                <span style={{ color: '#000000', fontSize: '0.75rem', fontWeight: 600 }}>
-                  Scan with phone camera
-                </span>
-              </div>
-            )}
-
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
-              Only devices tuned to room <code style={{ color: '#06b6d4' }}>{room}</code> will receive alerts.
-            </p>
-          </div>
-
-          {/* Sound Preferences & Quick Connect */}
-          <div>
-            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.4rem' }}>
-              <Bell size={14} color="#f59e0b" />
-              Siren Audio Tone & Voice
-            </label>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
-              {(['siren', 'alarm', 'chime', 'beep'] as const).map(type => (
-                <button
-                  key={type}
-                  onClick={() => {
-                    setSoundType(type);
-                    if (isAudioEnabled) audioAlertEngine.playSound(type);
-                  }}
-                  style={{
-                    padding: '0.35rem 0.65rem',
-                    borderRadius: '6px',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    textTransform: 'capitalize',
-                    background: soundType === type ? '#ef4444' : 'var(--bg-secondary)',
-                    color: soundType === type ? '#ffffff' : 'var(--text-muted)',
-                    border: `1px solid ${soundType === type ? '#ef4444' : varCSS('--border')}`,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {type}
-                </button>
-              ))}
-              <button
-                onClick={() => setIsSpeechEnabled(!isSpeechEnabled)}
-                style={{
-                  padding: '0.35rem 0.65rem',
-                  borderRadius: '6px',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  background: isSpeechEnabled ? 'rgba(139, 92, 246, 0.2)' : 'var(--bg-secondary)',
-                  color: isSpeechEnabled ? '#c084fc' : 'var(--text-muted)',
-                  border: '1px solid var(--border)',
-                  cursor: 'pointer'
-                }}
-              >
-                🗣️ Voice {isSpeechEnabled ? 'ON' : 'OFF'}
-              </button>
-            </div>
-
-            {/* Quick VS Code Config copy */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <button
-                onClick={copySettingSnippet}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  padding: '0.35rem 0.6rem',
-                  background: 'var(--bg-secondary)',
-                  color: 'var(--text-main)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '6px',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer'
-                }}
-              >
-                {isSettingCopied ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
-                Copy VS Code Setting: <code>"heyhuman.webRoom": "{room}"</code>
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* Live Pending Alert Siren Banner */}
+        
+        {/* Active Alert Banner (When an AI tool is waiting) */}
         {activePendingCount > 0 && (
           <div 
             className="siren-active"
             style={{
-              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(185, 28, 28, 0.25))',
-              border: '2px solid #ef4444',
-              borderRadius: '12px',
-              padding: '1.25rem',
+              background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.18), rgba(15, 23, 42, 0.8))',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid #f43f5e',
+              borderRadius: '14px',
+              padding: '1.35rem 1.5rem',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '1rem',
+              gap: '1.25rem',
               flexWrap: 'wrap'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <div style={{
-                background: '#ef4444',
+                background: '#f43f5e',
                 color: '#ffffff',
-                borderRadius: '50%',
-                width: '44px',
-                height: '44px',
+                borderRadius: '12px',
+                width: '46px',
+                height: '46px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                flexShrink: 0
+                flexShrink: 0,
+                boxShadow: '0 0 24px rgba(244, 63, 94, 0.6)'
               }}>
                 <ShieldAlert size={26} />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f87171' }}>
-                  AI IS WAITING FOR YOUR PERMISSION! ({activePendingCount})
-                </h3>
-                <p style={{ fontSize: '0.85rem', color: '#fca5a5' }}>
-                  Check your terminal or IDE window to approve the action.
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff' }}>
+                    APPROVAL REQUIRED ({activePendingCount})
+                  </h3>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: '#cbd5e1', marginTop: '0.15rem' }}>
+                  Your autonomous agent is suspended waiting for permission in your editor/terminal.
                 </p>
               </div>
             </div>
@@ -572,19 +439,20 @@ export function App() {
                 const pending = alerts.find(a => !a.resolved);
                 if (pending) handleResolve(pending.id);
               }}
+              className="interactive-hover"
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.4rem',
+                gap: '0.45rem',
                 background: '#10b981',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '8px',
-                padding: '0.65rem 1.4rem',
-                fontSize: '0.95rem',
+                padding: '0.7rem 1.4rem',
+                fontSize: '0.9rem',
                 fontWeight: 700,
                 cursor: 'pointer',
-                boxShadow: '0 2px 10px rgba(16, 185, 129, 0.4)'
+                boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)'
               }}
             >
               <CheckCircle2 size={18} />
@@ -593,20 +461,199 @@ export function App() {
           </div>
         )}
 
+        {/* Workspace Tuning & Controls */}
+        <section className="glass-panel" style={{
+          borderRadius: '14px',
+          padding: '1.35rem',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
+          gap: '1.5rem'
+        }}>
+          {/* Room Configuration */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Radio size={13} color="#06b6d4" />
+                Alert Room Channel
+              </label>
+              <span style={{ fontSize: '0.7rem', color: '#06b6d4', fontWeight: 600 }}>Multi-User Isolated</span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              <input 
+                type="text"
+                value={room}
+                onChange={e => handleRoomChange(e.target.value)}
+                placeholder="e.g. akdey"
+                className="mono"
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-main)',
+                  padding: '0.55rem 0.8rem',
+                  borderRadius: '8px',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  flex: 1,
+                  outline: 'none'
+                }}
+              />
+              <button
+                onClick={handleRandomRoom}
+                title="Generate new unique room"
+                className="interactive-hover"
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-muted)',
+                  borderRadius: '8px',
+                  padding: '0 0.75rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 600
+                }}
+              >
+                <Shuffle size={13} /> New
+              </button>
+              <button
+                onClick={() => setShowQR(!showQR)}
+                title="Scan QR Code to pair mobile phone"
+                className="interactive-hover"
+                style={{
+                  background: showQR ? '#06b6d4' : 'var(--bg-secondary)',
+                  color: showQR ? '#000000' : 'var(--text-main)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  padding: '0 0.85rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 700
+                }}
+              >
+                <QrCode size={15} /> QR
+              </button>
+            </div>
+
+            {/* QR Code Card */}
+            {showQR && (
+              <div style={{
+                marginTop: '1rem',
+                background: '#ffffff',
+                padding: '1.25rem',
+                borderRadius: '10px',
+                display: 'inline-flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '0.6rem',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+              }}>
+                <QRCodeSVG value={roomUrl} size={150} />
+                <span style={{ color: '#0f172a', fontSize: '0.75rem', fontWeight: 700 }}>
+                  Scan with mobile camera to open room
+                </span>
+              </div>
+            )}
+
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', marginTop: '0.45rem' }}>
+              Only devices tuned to room <code className="mono" style={{ color: '#06b6d4' }}>{room}</code> receive this broadcast.
+            </p>
+          </div>
+
+          {/* Sound Profile & Sync */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Volume1 size={14} color="#f59e0b" />
+                Acoustic Siren Profile
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+              {(['siren', 'alarm', 'chime', 'beep'] as const).map(type => (
+                <button
+                  key={type}
+                  onClick={() => {
+                    setSoundType(type);
+                    if (isAudioEnabled) audioAlertEngine.playSound(type);
+                  }}
+                  className="interactive-hover"
+                  style={{
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '7px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    textTransform: 'capitalize',
+                    background: soundType === type ? '#f43f5e' : 'var(--bg-secondary)',
+                    color: soundType === type ? '#ffffff' : 'var(--text-muted)',
+                    border: `1px solid ${soundType === type ? '#f43f5e' : 'var(--border)'}`,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {type}
+                </button>
+              ))}
+              <button
+                onClick={() => setIsSpeechEnabled(!isSpeechEnabled)}
+                className="interactive-hover"
+                style={{
+                  padding: '0.35rem 0.75rem',
+                  borderRadius: '7px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  background: isSpeechEnabled ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-secondary)',
+                  color: isSpeechEnabled ? '#60a5fa' : 'var(--text-muted)',
+                  border: `1px solid ${isSpeechEnabled ? 'rgba(59, 130, 246, 0.4)' : 'var(--border)'}`,
+                  cursor: 'pointer'
+                }}
+              >
+                Voice Speech {isSpeechEnabled ? 'ON' : 'OFF'}
+              </button>
+            </div>
+
+            {/* Extension Sync Hook */}
+            <button
+              onClick={copySettingSnippet}
+              className="interactive-hover"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.4rem 0.75rem',
+                background: 'var(--bg-secondary)',
+                color: 'var(--text-main)',
+                border: '1px solid var(--border)',
+                borderRadius: '7px',
+                fontSize: '0.75rem',
+                cursor: 'pointer'
+              }}
+            >
+              {isSettingCopied ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
+              <span>Copy Extension Setting: <code className="mono" style={{ color: '#06b6d4' }}>"heyhuman.webRoom": "{room}"</code></span>
+            </button>
+          </div>
+        </section>
+
         {/* Incoming Alerts Feed */}
         <section>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-            <h2 style={{ fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Bot size={18} color="#8b5cf6" />
-              Incoming Permission Alerts (Room: {room})
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
+            <h2 style={{ fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Bot size={17} color="#06b6d4" />
+              Live Permission Feed
             </h2>
             {alerts.length > 0 && (
               <button
                 onClick={handleClearAll}
+                className="interactive-hover"
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: 'var(--text-muted)',
+                  color: 'var(--text-subtle)',
                   fontSize: '0.75rem',
                   display: 'flex',
                   alignItems: 'center',
@@ -614,24 +661,24 @@ export function App() {
                   cursor: 'pointer'
                 }}
               >
-                <Trash2 size={14} /> Clear History
+                <Trash2 size={13} /> Clear Feed
               </button>
             )}
           </div>
 
           {alerts.length === 0 ? (
-            <div style={{
-              background: 'var(--bg-card)',
-              border: '1px dashed var(--border)',
-              borderRadius: '12px',
-              padding: '2.5rem 1rem',
+            <div className="glass-panel" style={{
+              borderRadius: '14px',
+              padding: '3rem 1.5rem',
               textAlign: 'center',
-              color: 'var(--text-muted)'
+              border: '1px dashed var(--border)'
             }}>
-              <Radio size={36} style={{ margin: '0 auto 0.75rem auto', opacity: 0.5, color: '#06b6d4' }} />
-              <p style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)' }}>Listening for AI permissions in room "{room}"...</p>
-              <p style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
-                Open this room on your phone, or tap "Test Siren" above to trigger a test alert.
+              <Radio size={32} style={{ margin: '0 auto 0.75rem auto', opacity: 0.4, color: '#06b6d4' }} />
+              <p style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)' }}>
+                Listening on room <span className="mono" style={{ color: '#06b6d4' }}>{room}</span>
+              </p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-subtle)', marginTop: '0.3rem', maxWidth: '420px', margin: '0.3rem auto 0 auto' }}>
+                Keep this tab open on your phone or tablet while away from your desk. You will hear an audible siren the moment your AI pauses for approval.
               </p>
             </div>
           ) : (
@@ -639,53 +686,51 @@ export function App() {
               {alerts.map(item => (
                 <div
                   key={item.id}
+                  className="glass-panel interactive-hover"
                   style={{
-                    background: item.resolved ? 'var(--bg-secondary)' : 'var(--bg-card)',
-                    border: `1px solid ${item.resolved ? 'var(--border)' : '#ef4444'}`,
-                    borderRadius: '10px',
-                    padding: '1rem',
+                    borderRadius: '12px',
+                    padding: '1.1rem 1.25rem',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     gap: '1rem',
-                    opacity: item.resolved ? 0.7 : 1,
-                    transition: 'all 0.2s ease'
+                    border: `1px solid ${item.resolved ? 'var(--border)' : '#f43f5e'}`,
+                    opacity: item.resolved ? 0.65 : 1
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem' }}>
                     <div style={{
-                      background: item.resolved ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                      color: item.resolved ? '#10b981' : '#ef4444',
-                      borderRadius: '8px',
-                      padding: '0.5rem',
+                      background: item.resolved ? 'rgba(16, 185, 129, 0.12)' : 'rgba(244, 63, 94, 0.15)',
+                      color: item.resolved ? '#10b981' : '#f43f5e',
+                      borderRadius: '10px',
+                      padding: '0.55rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0
                     }}>
-                      {item.resolved ? <CheckCircle2 size={20} /> : <ShieldAlert size={20} />}
+                      {item.resolved ? <CheckCircle2 size={19} /> : <ShieldAlert size={19} />}
                     </div>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{item.agent}</span>
+                        <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#ffffff' }}>{item.agent}</span>
                         {item.tool && (
-                          <span style={{
+                          <span className="mono" style={{
                             fontSize: '0.7rem',
                             background: 'var(--bg-secondary)',
-                            color: '#06b6d4',
-                            padding: '0.1rem 0.4rem',
-                            borderRadius: '4px',
-                            border: '1px solid var(--border)',
-                            fontFamily: 'monospace'
+                            color: '#38bdf8',
+                            padding: '0.12rem 0.45rem',
+                            borderRadius: '5px',
+                            border: '1px solid var(--border)'
                           }}>
                             {item.tool}
                           </span>
                         )}
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-subtle)' }}>
                           {new Date(item.timestamp).toLocaleTimeString()}
                         </span>
                       </div>
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                      <p style={{ fontSize: '0.83rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
                         {item.description}
                       </p>
                     </div>
@@ -694,13 +739,14 @@ export function App() {
                   {!item.resolved && (
                     <button
                       onClick={() => handleResolve(item.id)}
+                      className="interactive-hover"
                       style={{
-                        background: 'rgba(16, 185, 129, 0.15)',
+                        background: 'rgba(16, 185, 129, 0.12)',
                         color: '#10b981',
-                        border: '1px solid #10b981',
-                        borderRadius: '6px',
-                        padding: '0.4rem 0.75rem',
-                        fontSize: '0.75rem',
+                        border: '1px solid rgba(16, 185, 129, 0.35)',
+                        borderRadius: '7px',
+                        padding: '0.45rem 0.85rem',
+                        fontSize: '0.78rem',
                         fontWeight: 600,
                         cursor: 'pointer',
                         flexShrink: 0
@@ -715,34 +761,32 @@ export function App() {
           )}
         </section>
 
-        {/* Integration Instructions */}
-        <section style={{
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border)',
-          borderRadius: '12px',
+        {/* Integration Snippet */}
+        <section className="glass-panel" style={{
+          borderRadius: '14px',
           padding: '1.25rem'
         }}>
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
-            <Terminal size={16} color="#06b6d4" />
-            Connect Your Agent, Hook, or CLI
-          </h3>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-            Trigger an alert for room <strong>{room}</strong> from any script:
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#ffffff' }}>
+              <Terminal size={15} color="#06b6d4" />
+              Direct Webhook Hook (Claude Code / Aider / Cursor / Shell)
+            </h3>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>HTTP POST</span>
+          </div>
 
           <div style={{
             background: 'var(--bg-secondary)',
             border: '1px solid var(--border)',
-            borderRadius: '8px',
-            padding: '0.75rem',
+            borderRadius: '9px',
+            padding: '0.85rem 1rem',
             position: 'relative',
-            fontFamily: 'monospace',
-            fontSize: '0.75rem',
+            fontSize: '0.76rem',
             color: '#38bdf8',
             overflowX: 'auto'
           }}>
             <button
               onClick={copyWebhook}
+              className="interactive-hover"
               style={{
                 position: 'absolute',
                 top: '0.5rem',
@@ -750,7 +794,7 @@ export function App() {
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border)',
                 borderRadius: '6px',
-                padding: '0.25rem 0.5rem',
+                padding: '0.25rem 0.55rem',
                 color: 'var(--text-main)',
                 fontSize: '0.7rem',
                 cursor: 'pointer',
@@ -762,28 +806,56 @@ export function App() {
               {isCopied ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
               {isCopied ? 'Copied' : 'Copy'}
             </button>
-            <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{webhookCurlExample}</pre>
+            <pre className="mono" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{webhookCurlExample}</pre>
           </div>
         </section>
       </main>
 
-      {/* Footer */}
+      {/* Footer with Attribution */}
       <footer style={{
         marginTop: 'auto',
         textAlign: 'center',
-        padding: '1.5rem',
-        fontSize: '0.75rem',
-        color: 'var(--text-muted)',
-        borderTop: '1px solid var(--border)'
+        padding: '2rem 1.25rem 1.5rem 1.25rem',
+        borderTop: '1px solid var(--border)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '0.4rem'
       }}>
-        HeyHuman · Open Source Multi-User AI Permission Siren · PWA Ready
+        <div style={{
+          fontSize: '0.8rem',
+          color: 'var(--text-muted)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.35rem',
+          flexWrap: 'wrap',
+          justifyContent: 'center'
+        }}>
+          <span>Designed & Engineered by</span>
+          <a 
+            href="https://portfolio.akdey.vercel.app/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{
+              color: '#ffffff',
+              fontWeight: 700,
+              textDecoration: 'none',
+              borderBottom: '1px dotted #38bdf8',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.25rem'
+            }}
+          >
+            AMIT KUMAR DEY
+            <ExternalLink size={12} color="#38bdf8" />
+          </a>
+        </div>
+        <p style={{ fontSize: '0.72rem', color: 'var(--text-subtle)' }}>
+          HeyHuman · Open Source AI Permission Siren & Mobile Alert System
+        </p>
       </footer>
     </div>
   );
-}
-
-function varCSS(name: string) {
-  return `var(${name})`;
 }
 
 export default App;
