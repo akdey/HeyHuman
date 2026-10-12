@@ -105,7 +105,12 @@
         },
         "heyhuman.sound.type": {
           "type": "string",
-          "enum": ["siren", "alarm", "chime", "beep"],
+          "enum": [
+            "siren",
+            "alarm",
+            "chime",
+            "beep"
+          ],
           "default": "siren",
           "description": "Select the alert sound."
         },
@@ -176,6 +181,7 @@
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^2.24.0",
     "mocha": "^10.4.0",
+    "ovsx": "^1.2.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5"
   }

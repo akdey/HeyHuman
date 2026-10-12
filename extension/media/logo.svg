@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+  <defs>
+    <!-- Background Canvas Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#080D1A" />
+      <stop offset="50%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#1E293B" />
+    </linearGradient>
+
+    <!-- Robot Body Gradient -->
+    <linearGradient id="robotBodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#0F172A" />
+    </linearGradient>
+
+    <!-- Robot Visor Screen Gradient -->
+    <linearGradient id="visorGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#020617" />
+      <stop offset="100%" stop-color="#0B0F19" />
+    </linearGradient>
+
+    <!-- Siren Beacon Glow Gradient -->
+    <radialGradient id="beaconGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FF3B30" stop-opacity="0.8" />
+      <stop offset="45%" stop-color="#EF4444" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#EF4444" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Siren Dome Gradient -->
+    <linearGradient id="sirenDomeGrad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#FFA07A" />
+      <stop offset="30%" stop-color="#FF3B30" />
+      <stop offset="100%" stop-color="#DC2626" />
+    </linearGradient>
+
+    <!-- Cyan Neon Accent Gradient -->
+    <linearGradient id="cyanNeon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </linearGradient>
+
+    <!-- Eye Glow Filter -->
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Modern App Icon Squircle Canvas -->
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="url(#bgGrad)" stroke="#334155" stroke-width="4" />
+
+  <!-- Siren Light Ambient Glow -->
+  <circle cx="256" cy="116" r="110" fill="url(#beaconGlow)" />
+
+  <!-- Siren Sound / Alert Waves -->
+  <!-- Inner Alert Arcs -->
+  <path d="M 194 100 A 44 44 0 0 0 194 140" stroke="#FF453A" stroke-width="8" stroke-linecap="round" />
+  <path d="M 318 100 A 44 44 0 0 1 318 140" stroke="#FF453A" stroke-width="8" stroke-linecap="round" />
+  
+  <!-- Outer Alert Arcs -->
+  <path d="M 168 84 A 72 72 0 0 0 168 156" stroke="#FF9F0A" stroke-width="7" stroke-linecap="round" stroke-opacity="0.9" />
+  <path d="M 344 84 A 72 72 0 0 1 344 156" stroke="#FF9F0A" stroke-width="7" stroke-linecap="round" stroke-opacity="0.9" />
+
+  <!-- Siren Beacon Assembly -->
+  <!-- Base Stem Connecting to Head -->
+  <line x1="256" y1="138" x2="256" y2="164" stroke="#64748B" stroke-width="10" stroke-linecap="round" />
+  <!-- Beacon Mounting Collar -->
+  <rect x="226" y="132" width="60" height="14" rx="7" fill="#475569" stroke="#64748B" stroke-width="2" />
+  <!-- Beacon Dome Bulb -->
+  <path d="M 230 132 C 230 86 282 86 282 132 Z" fill="url(#sirenDomeGrad)" stroke="#FFD60A" stroke-width="3" />
+  <!-- Dome Specular Highlight -->
+  <ellipse cx="256" cy="110" rx="12" ry="16" fill="#FFFFFF" opacity="0.65" />
+
+  <!-- Robot Ears / Antennas (Left & Right) -->
+  <rect x="80" y="246" width="22" height="60" rx="11" fill="#1E293B" stroke="#38BDF8" stroke-width="4" />
+  <rect x="410" y="246" width="22" height="60" rx="11" fill="#1E293B" stroke="#38BDF8" stroke-width="4" />
+
+  <!-- Robot Head -->
+  <rect x="98" y="160" width="316" height="248" rx="52" fill="url(#robotBodyGrad)" stroke="#38BDF8" stroke-width="8" />
+
+  <!-- Visor Screen -->
+  <rect x="134" y="200" width="244" height="140" rx="32" fill="url(#visorGrad)" stroke="#0284C7" stroke-width="4" />
+
+  <!-- Sarcastic / Impatient LED Eyes -->
+  <g filter="url(#neonGlow)">
+    <!-- Left Eye LED Bar -->
+    <rect x="168" y="248" width="56" height="20" rx="10" fill="#38BDF8" />
+    <!-- Right Eye LED Bar -->
+    <rect x="288" y="248" width="56" height="20" rx="10" fill="#38BDF8" />
+  </g>
+
+  <!-- Sarcastic Half-Closed Eyelid Angles ("Still waiting on you, human...") -->
+  <!-- Left Eyelid Cut -->
+  <path d="M 162 242 L 230 252" stroke="#020617" stroke-width="9" stroke-linecap="round" />
+  <!-- Right Eyelid Cut -->
+  <path d="M 282 252 L 350 242" stroke="#020617" stroke-width="9" stroke-linecap="round" />
+
+  <!-- Flat Impatient Mouth Line -->
+  <path d="M 228 304 Q 256 308 284 304" stroke="#38BDF8" stroke-width="6" stroke-linecap="round" />
+
+  <!-- Subtle Chin Status Indicator / Permission Pulse Pill -->
+  <rect x="236" y="366" width="40" height="8" rx="4" fill="#38BDF8" opacity="0.75" />
+</svg>
