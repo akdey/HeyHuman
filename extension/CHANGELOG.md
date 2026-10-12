@@ -2,6 +2,13 @@
 
 All notable changes to the "heyhuman" extension will be documented in this file.
 
+## [1.2.0] - 2026-10-13
+
+### Added
+- **Mobile Web App & PWA Relay**: Full mobile siren support via Vercel serverless relay. Allows developers to step away from their desk and receive sirens, voice announcements, vibration, and push notifications on mobile phones.
+- **Interactive Room Pairing Command**: Added `HeyHuman: Set Web Room ID` (`heyhuman.setWebRoom`) interactive input box in the Command Palette and Status Bar quick menu.
+- **Web Alert Dispatcher**: Integrated automatic non-blocking alert streaming to configured Web Rooms from `AlertManager` across all 5 supported AI agents (Antigravity, Copilot, Claude Code, Cursor, Aider).
+
 ## [1.1.2] - 2026-10-12
 
 ### Added

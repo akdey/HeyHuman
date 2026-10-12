@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://marketplace.visualstudio.com/items?itemName=akdey.heyhuman"><img src="https://img.shields.io/badge/VS_Code_Marketplace-akdey.heyhuman-blue?logo=visualstudiocode" alt="VS Code Marketplace"></a>
   <a href="https://open-vsx.org/extension/akdey/heyhuman"><img src="https://img.shields.io/badge/Open_VSX-akdey.heyhuman-purple?logo=eclipse" alt="Open VSX"></a>
-  <a href="https://github.com/akdey/HeyHuman/releases/tag/v1.1.2"><img src="https://img.shields.io/badge/Release-v1.1.2-green" alt="Release"></a>
+  <a href="https://github.com/akdey/HeyHuman/releases/tag/v1.2.0"><img src="https://img.shields.io/badge/Release-v1.2.0-green" alt="Release"></a>
   <img src="https://img.shields.io/badge/PWA-Ready-orange" alt="PWA Ready">
 </p>
 
@@ -27,9 +27,10 @@
 | 🪟 **Contextual Window Focus** | Automatically focuses editor, terminal panel, or chat on approval prompts | ✅ Done |
 | 🌐 **PWA & Mobile Relay App** | Web app for phones/tablets away from desk; zero local installation needed | ✅ Done |
 | 📱 **QR Code Mobile Pairing** | Instant phone camera scan to tune phone to your desktop's alert room | ✅ Done |
+| 🔄 **Rotate Key & Auto-Tune** | Instantly generate/cycle secure room keys with automatic persistent tuning | ✅ Done |
 | 🗣️ **Voice Speech Alerts** | Text-to-speech announcement: *"Hey human! AI needs your permission!"* | ✅ Done |
 | 🔒 **Multi-User Room Isolation** | Unique isolated rooms (`?room=akdey`) so alerts never leak to others | ✅ Done |
-| 🪝 **Direct Webhook API** | Simple `curl` / HTTP POST integration for custom CLI tools and pipelines | ✅ Done |
+| 🪝 **Direct Webhook API** | Simple HTTP POST integration for custom CLI tools and pipelines | ✅ Done |
 
 ---
 
@@ -62,8 +63,9 @@ For developers away from their desk, cooking, or on their phone where desktop si
 
 ### Key Highlights
 - **PWA Installable**: Add to Home Screen on iOS Safari and Android Chrome.
-- **QR Code Pairing**: Click "QR" in the web app, scan with your phone camera, and your phone is instantly paired.
-- **Acoustic Fallback**: Synthesized Web Audio oscillator engine that works offline and across restrictive mobile browsers.
+- **QR Code Pairing**: Instant scan with your phone camera, with robot logo centered in the QR code.
+- **Rotate Key Support**: 1-click button to cycle new secure room IDs (`hyper-orbit-318`).
+- **Acoustic Fallback**: Synthesized Web Audio oscillator engine that works offline and across mobile browsers.
 - **Haptic Feedback**: Mobile vibration sequence on incoming alerts.
 
 ### 1-Click Deployment to Vercel
@@ -72,16 +74,10 @@ For developers away from their desk, cooking, or on their phone where desktop si
 3. Click **Deploy**.
 
 ### Connect Your Extension to Your Phone
-In VS Code / Antigravity settings (`settings.json`):
-```json
-"heyhuman.webRoom": "your-room-name"
-```
-Or use the webhook from any shell script or Claude Code hook:
-```bash
-curl -X POST "https://your-domain.vercel.app/api/alert?room=your-room-name" \
-  -H "Content-Type: application/json" \
-  -d '{"agent":"Claude Code","tool":"Terminal","description":"Permission needed"}'
-```
+In VS Code / Antigravity:
+1. Press `Cmd+Shift+P` &rarr; choose **`HeyHuman: Set Web Room ID`**.
+2. Type or paste your room code (e.g. `akdey`).
+3. Done! All permission alerts from Antigravity, Copilot, Claude, Cursor, and Aider will stream directly to your phone.
 
 ---
 
