@@ -88,7 +88,8 @@ export class AlertManager {
         id: event.id,
         agent: event.agent.toUpperCase(),
         tool: event.type,
-        description: event.details || event.summary,
+        command: event.details || '',
+        description: event.summary,
         timestamp: event.timestamp
       };
 

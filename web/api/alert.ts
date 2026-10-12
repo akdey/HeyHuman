@@ -1,12 +1,12 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 
 // In-memory alert store for serverless environment
-// Maps roomId -> Array of Alerts
-interface AlertItem {
+export interface AlertItem {
   id: string;
   agent: string;
   type: string;
   tool?: string;
+  command?: string;
   description?: string;
   timestamp: number;
   resolved?: boolean;
@@ -36,10 +36,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'POST') {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
     
-    // Check if it's a resolve action
+    // Check if it's a resolve action from mobile
     if (body.action === 'resolve') {
       const existing = roomAlerts.get(roomId) || [];
-      const updated = existing.map(a => a.id === body.id ? { ...a, resolved: true } : a);
+      const updated = existing.map(a => (!body.id || a.id === body.id) ? { ...a, resolved: true } : a);
       roomAlerts.set(roomId, updated);
       return res.status(200).json({ ok: true, message: 'Alert resolved' });
     }
@@ -49,12 +49,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, message: 'All alerts cleared' });
     }
 
+    const commandValue = body.command || body.details || body.tool || '';
+    const descriptionValue = body.description || body.summary || body.message || 'AI agent is waiting for your permission!';
+
     const newAlert: AlertItem = {
       id: body.id || `alert_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       agent: body.agent || 'AI Agent',
       type: body.type || 'Permission Request',
-      tool: body.tool || body.command || 'Action Approval',
-      description: body.description || body.message || 'AI agent is waiting for your permission!',
+      tool: body.tool || body.type || 'Action Approval',
+      command: commandValue,
+      description: descriptionValue,
       timestamp: Date.now(),
       resolved: false
     };

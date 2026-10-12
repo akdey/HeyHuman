@@ -21,6 +21,7 @@ interface AlertItem {
   agent: string;
   type: string;
   tool?: string;
+  command?: string;
   description?: string;
   timestamp: number;
   resolved?: boolean;
@@ -295,7 +296,7 @@ export function App() {
               <ShieldAlert size={34} />
             </div>
 
-            <div>
+            <div style={{ width: '100%', maxWidth: '440px' }}>
               <span style={{
                 fontSize: '0.75rem',
                 fontWeight: 700,
@@ -305,12 +306,39 @@ export function App() {
               }}>
                 {pendingAlert.agent}
               </span>
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '0.2rem', letterSpacing: '-0.02em' }}>
+              <h2 style={{ fontSize: '1.35rem', fontWeight: 800, marginTop: '0.2rem', letterSpacing: '-0.02em' }}>
                 Approval Required
               </h2>
-              <p style={{ fontSize: '0.88rem', color: 'var(--text-2)', marginTop: '0.4rem', lineHeight: '1.4' }}>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-1)', marginTop: '0.35rem', lineHeight: '1.4' }}>
                 {pendingAlert.description}
               </p>
+
+              {/* Exact Command or Action awaiting permission */}
+              {pendingAlert.command && (
+                <div style={{
+                  marginTop: '0.85rem',
+                  background: 'rgba(0, 0, 0, 0.45)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '10px',
+                  padding: '0.65rem 0.85rem',
+                  textAlign: 'left'
+                }}>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.25rem' }}>
+                    Command / Action:
+                  </span>
+                  <code style={{
+                    fontSize: '0.78rem',
+                    color: '#38bdf8',
+                    fontFamily: 'var(--font-mono)',
+                    wordBreak: 'break-all',
+                    display: 'block',
+                    maxHeight: '120px',
+                    overflowY: 'auto'
+                  }}>
+                    {pendingAlert.command}
+                  </code>
+                </div>
+              )}
             </div>
 
             <button
