@@ -164,6 +164,16 @@
           "type": "string",
           "default": "",
           "description": "Custom path for Copilot chat transcripts or logs (leave empty for auto-detection)."
+        },
+        "heyhuman.webRoom": {
+          "type": "string",
+          "default": "",
+          "description": "Optional HeyHuman Web App Room ID (e.g. 'akdey'). Broadcasts alerts to your mobile phone via PWA/Vercel."
+        },
+        "heyhuman.webEndpoint": {
+          "type": "string",
+          "default": "https://heyhuman.vercel.app",
+          "description": "URL of the HeyHuman web application (defaults to https://heyhuman.vercel.app)."
         }
       }
     }

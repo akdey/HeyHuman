@@ -66,7 +66,43 @@ export class AlertManager {
       });
     }
 
+    // 7. Dispatch to Mobile Web App room if configured
+    const webRoom = this.settings.getWebRoom();
+    if (webRoom) {
+      this.dispatchWebAlert(event, webRoom).catch((err) => {
+        console.warn('[HeyHuman] Web alert dispatch error:', err);
+      });
+    }
+
     return true;
+  }
+
+  /**
+   * Dispatches the alert to the HeyHuman web app room for mobile sirens
+   */
+  private async dispatchWebAlert(event: PermissionEvent, room: string): Promise<void> {
+    try {
+      const endpoint = this.settings.getWebEndpoint();
+      const url = `${endpoint.replace(/\/+$/, '')}/api/alert?room=${encodeURIComponent(room)}`;
+      const payload = {
+        id: event.id,
+        agent: event.agent.toUpperCase(),
+        tool: event.type,
+        description: event.details || event.summary,
+        timestamp: event.timestamp
+      };
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        console.warn('[HeyHuman] Web alert returned status', res.status);
+      }
+    } catch (err) {
+      console.warn('[HeyHuman] Failed to send web alert:', err);
+    }
   }
 
   /**

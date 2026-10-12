@@ -11,8 +11,11 @@ import {
   Copy, 
   Check, 
   Smartphone,
-  Bot
+  Bot,
+  QrCode,
+  Shuffle
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
 import { audioAlertEngine } from './audioEngine';
 
@@ -26,10 +29,19 @@ interface AlertItem {
   resolved?: boolean;
 }
 
+const RANDOM_ADJECTIVES = ['fast', 'clever', 'swift', 'hyper', 'crypto', 'silent', 'wild', 'super'];
+const RANDOM_NOUNS = ['lynx', 'falcon', 'tiger', 'robot', 'badger', 'panther', 'viper', 'matrix'];
+
+function generateRandomRoom(): string {
+  const adj = RANDOM_ADJECTIVES[Math.floor(Math.random() * RANDOM_ADJECTIVES.length)];
+  const noun = RANDOM_NOUNS[Math.floor(Math.random() * RANDOM_NOUNS.length)];
+  const num = Math.floor(100 + Math.random() * 900);
+  return `${adj}-${noun}-${num}`;
+}
+
 export function App() {
-  // Query param room support: ?room=myname
   const searchParams = new URLSearchParams(window.location.search);
-  const initialRoom = searchParams.get('room') || 'general';
+  const initialRoom = searchParams.get('room') || 'my-room';
 
   const [room, setRoom] = useState<string>(initialRoom);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
@@ -37,21 +49,23 @@ export function App() {
   const [soundType, setSoundType] = useState<'siren' | 'alarm' | 'chime' | 'beep'>('siren');
   const [isSpeechEnabled, setIsSpeechEnabled] = useState<boolean>(true);
   const [isCopied, setIsCopied] = useState<boolean>(false);
+  const [isSettingCopied, setIsSettingCopied] = useState<boolean>(false);
   const [isTesting, setIsTesting] = useState<boolean>(false);
   const [isFlashing, setIsFlashing] = useState<boolean>(false);
+  const [showQR, setShowQR] = useState<boolean>(false);
   const [activePendingCount, setActivePendingCount] = useState<number>(0);
 
   const lastSeenIdRef = useRef<string | null>(null);
   const pollerRef = useRef<number | null>(null);
 
-  // Setup Web Push Notification permission request
+  const roomUrl = `${window.location.origin}?room=${room}`;
+
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
   }, []);
 
-  // Update room in URL when changed without reloading
   const handleRoomChange = (newRoom: string) => {
     const sanitized = newRoom.toLowerCase().replace(/[^a-z0-9_-]/g, '');
     setRoom(sanitized);
@@ -60,7 +74,11 @@ export function App() {
     window.history.replaceState({}, '', url.toString());
   };
 
-  // Poll serverless backend for alerts
+  const handleRandomRoom = () => {
+    const r = generateRandomRoom();
+    handleRoomChange(r);
+  };
+
   useEffect(() => {
     const fetchAlerts = async () => {
       try {
@@ -76,7 +94,6 @@ export function App() {
 
           if (pending.length > 0) {
             const newest = pending[0];
-            // If new pending alert arrived that we haven't alerted for yet
             if (newest.id !== lastSeenIdRef.current) {
               lastSeenIdRef.current = newest.id;
               triggerAlertSequence(newest);
@@ -85,13 +102,13 @@ export function App() {
             setIsFlashing(false);
           }
         }
-      } catch (err) {
-        // Silently retry next poll
+      } catch {
+        // Silently retry
       }
     };
 
     fetchAlerts();
-    pollerRef.current = window.setInterval(fetchAlerts, 2500);
+    pollerRef.current = window.setInterval(fetchAlerts, 2000);
 
     return () => {
       if (pollerRef.current) window.clearInterval(pollerRef.current);
@@ -99,10 +116,8 @@ export function App() {
   }, [room, isAudioEnabled, isSpeechEnabled, soundType]);
 
   const triggerAlertSequence = (item: AlertItem) => {
-    // 1. Screen flash
     setIsFlashing(true);
 
-    // 2. Play audio if unlocked
     if (isAudioEnabled) {
       audioAlertEngine.playSound(soundType);
       if (isSpeechEnabled) {
@@ -112,12 +127,10 @@ export function App() {
       }
     }
 
-    // 3. Vibration API for mobile devices
     if ('vibrate' in navigator) {
       navigator.vibrate([300, 150, 300, 150, 500]);
     }
 
-    // 4. Desktop / Mobile Browser notification
     if ('Notification' in window && Notification.permission === 'granted') {
       try {
         new Notification(`🚨 HeyHuman: ${item.agent}`, {
@@ -155,7 +168,6 @@ export function App() {
 
     triggerAlertSequence(testItem);
 
-    // Send to backend room
     try {
       await fetch(`/api/alert?room=${encodeURIComponent(room)}`, {
         method: 'POST',
@@ -163,7 +175,6 @@ export function App() {
         body: JSON.stringify(testItem)
       });
     } catch {
-      // Local preview fallback
       setAlerts(prev => [testItem, ...prev]);
     }
 
@@ -216,9 +227,15 @@ export function App() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  const copySettingSnippet = () => {
+    navigator.clipboard.writeText(`"heyhuman.webRoom": "${room}"`);
+    setIsSettingCopied(true);
+    setTimeout(() => setIsSettingCopied(false), 2000);
+  };
+
   return (
     <div className={`min-h-screen flex flex-col ${isFlashing ? 'screen-flashing' : ''}`} style={{ paddingBottom: '3rem' }}>
-      {/* Top Banner / Audio Activation prompt */}
+      {/* Audio Unlock Notification Bar for Mobile Devices */}
       {!isAudioEnabled && (
         <div style={{
           backgroundColor: '#3b82f6',
@@ -234,7 +251,7 @@ export function App() {
           boxShadow: '0 2px 10px rgba(59, 130, 246, 0.4)'
         }}>
           <Smartphone size={18} />
-          <span>Tap to enable mobile audio siren & voice alerts!</span>
+          <span>Tap to activate audio sirens and speech synthesis on your phone!</span>
           <button 
             onClick={enableAudio}
             style={{
@@ -247,7 +264,7 @@ export function App() {
               cursor: 'pointer'
             }}
           >
-            Enable Audio
+            Activate Sound
           </button>
         </div>
       )}
@@ -280,11 +297,11 @@ export function App() {
                 borderRadius: '999px',
                 border: '1px solid rgba(239, 68, 68, 0.3)'
               }}>
-                WEB ALERT
+                WEB & PWA
               </span>
             </div>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Loud audible siren & push alerts when your AI is waiting for you
+              Phone siren & push alerts when your AI is blocked waiting for you
             </p>
           </div>
         </div>
@@ -344,21 +361,21 @@ export function App() {
         flexDirection: 'column',
         gap: '1.5rem'
       }}>
-        {/* Status & Room Pairing Bar */}
+        {/* Multi-User Room Pairing Section */}
         <section style={{
           background: 'var(--bg-card)',
           border: '1px solid var(--border)',
           borderRadius: '12px',
-          padding: '1rem',
+          padding: '1.25rem',
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '1rem'
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '1.25rem'
         }}>
-          {/* Room Identifier */}
+          {/* Room Selection */}
           <div>
             <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.4rem' }}>
               <Radio size={14} color="#06b6d4" />
-              Your Personal Alert Room
+              Your Multi-User Room ID
             </label>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <input 
@@ -370,26 +387,83 @@ export function App() {
                   background: 'var(--bg-secondary)',
                   border: '1px solid var(--border)',
                   color: 'var(--text-main)',
-                  padding: '0.5rem 0.75rem',
+                  padding: '0.55rem 0.75rem',
                   borderRadius: '8px',
-                  fontSize: '0.9rem',
+                  fontSize: '0.95rem',
                   fontWeight: 600,
                   flex: 1
                 }}
               />
+              <button
+                onClick={handleRandomRoom}
+                title="Generate random room"
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-main)',
+                  borderRadius: '8px',
+                  padding: '0 0.75rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  fontSize: '0.8rem'
+                }}
+              >
+                <Shuffle size={14} /> New
+              </button>
+              <button
+                onClick={() => setShowQR(!showQR)}
+                title="Scan QR Code to open on mobile"
+                style={{
+                  background: showQR ? '#06b6d4' : 'var(--bg-secondary)',
+                  color: showQR ? '#000000' : 'var(--text-main)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  padding: '0 0.75rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 600
+                }}
+              >
+                <QrCode size={16} /> QR
+              </button>
             </div>
-            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-              Share this URL to open on your phone: <span style={{ color: '#06b6d4' }}>{window.location.origin}?room={room}</span>
+
+            {/* QR Code Popover */}
+            {showQR && (
+              <div style={{
+                marginTop: '1rem',
+                background: '#ffffff',
+                padding: '1rem',
+                borderRadius: '8px',
+                display: 'inline-flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <QRCodeSVG value={roomUrl} size={160} />
+                <span style={{ color: '#000000', fontSize: '0.75rem', fontWeight: 600 }}>
+                  Scan with phone camera
+                </span>
+              </div>
+            )}
+
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
+              Only devices tuned to room <code style={{ color: '#06b6d4' }}>{room}</code> will receive alerts.
             </p>
           </div>
 
-          {/* Sound Preferences */}
+          {/* Sound Preferences & Quick Connect */}
           <div>
             <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.4rem' }}>
               <Bell size={14} color="#f59e0b" />
-              Siren Tone & Voice
+              Siren Audio Tone & Voice
             </label>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
               {(['siren', 'alarm', 'chime', 'beep'] as const).map(type => (
                 <button
                   key={type}
@@ -425,18 +499,40 @@ export function App() {
                   cursor: 'pointer'
                 }}
               >
-                🗣️ Speech {isSpeechEnabled ? 'ON' : 'OFF'}
+                🗣️ Voice {isSpeechEnabled ? 'ON' : 'OFF'}
+              </button>
+            </div>
+
+            {/* Quick VS Code Config copy */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                onClick={copySettingSnippet}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.35rem 0.6rem',
+                  background: 'var(--bg-secondary)',
+                  color: 'var(--text-main)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer'
+                }}
+              >
+                {isSettingCopied ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
+                Copy VS Code Setting: <code>"heyhuman.webRoom": "{room}"</code>
               </button>
             </div>
           </div>
         </section>
 
-        {/* Live Pending Banner if an agent is waiting */}
+        {/* Live Pending Alert Siren Banner */}
         {activePendingCount > 0 && (
           <div 
             className="siren-active"
             style={{
-              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(185, 28, 28, 0.2))',
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(185, 28, 28, 0.25))',
               border: '2px solid #ef4444',
               borderRadius: '12px',
               padding: '1.25rem',
@@ -452,21 +548,21 @@ export function App() {
                 background: '#ef4444',
                 color: '#ffffff',
                 borderRadius: '50%',
-                width: '42px',
-                height: '42px',
+                width: '44px',
+                height: '44px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0
               }}>
-                <ShieldAlert size={24} />
+                <ShieldAlert size={26} />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f87171' }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f87171' }}>
                   AI IS WAITING FOR YOUR PERMISSION! ({activePendingCount})
                 </h3>
                 <p style={{ fontSize: '0.85rem', color: '#fca5a5' }}>
-                  Switch to your IDE or terminal window to approve the action.
+                  Check your terminal or IDE window to approve the action.
                 </p>
               </div>
             </div>
@@ -484,8 +580,8 @@ export function App() {
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '8px',
-                padding: '0.6rem 1.25rem',
-                fontSize: '0.9rem',
+                padding: '0.65rem 1.4rem',
+                fontSize: '0.95rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 boxShadow: '0 2px 10px rgba(16, 185, 129, 0.4)'
@@ -497,12 +593,12 @@ export function App() {
           </div>
         )}
 
-        {/* Alert Feed Section */}
+        {/* Incoming Alerts Feed */}
         <section>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
             <h2 style={{ fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Bot size={18} color="#8b5cf6" />
-              Incoming Permission Alerts
+              Incoming Permission Alerts (Room: {room})
             </h2>
             {alerts.length > 0 && (
               <button
@@ -533,9 +629,9 @@ export function App() {
               color: 'var(--text-muted)'
             }}>
               <Radio size={36} style={{ margin: '0 auto 0.75rem auto', opacity: 0.5, color: '#06b6d4' }} />
-              <p style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)' }}>Listening for AI permissions...</p>
+              <p style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-main)' }}>Listening for AI permissions in room "{room}"...</p>
               <p style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
-                Keep this tab open on your phone or computer. Click "Test Siren" above to test.
+                Open this room on your phone, or tap "Test Siren" above to trigger a test alert.
               </p>
             </div>
           ) : (
@@ -628,10 +724,10 @@ export function App() {
         }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
             <Terminal size={16} color="#06b6d4" />
-            Connect Your CLI or Agent (Claude Code, Aider, Antigravity)
+            Connect Your Agent, Hook, or CLI
           </h3>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-            Send a POST request whenever an AI tool pauses for permission:
+            Trigger an alert for room <strong>{room}</strong> from any script:
           </p>
 
           <div style={{
@@ -680,11 +776,11 @@ export function App() {
         color: 'var(--text-muted)',
         borderTop: '1px solid var(--border)'
       }}>
-        HeyHuman · Open Source AI Permission Siren · Designed for Antigravity, VS Code, Cursor & Claude Code
+        HeyHuman · Open Source Multi-User AI Permission Siren · PWA Ready
       </footer>
     </div>
   );
-};
+}
 
 function varCSS(name: string) {
   return `var(${name})`;

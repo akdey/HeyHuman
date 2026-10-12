@@ -135,6 +135,15 @@ export class SettingsManager {
     return this.getConfig().get<string>('aider.customLogPath', '').trim();
   }
 
+  // Webhook / Web App Room Sync
+  public getWebRoom(): string {
+    return this.getConfig().get<string>('webRoom', '').trim();
+  }
+
+  public getWebEndpoint(): string {
+    return this.getConfig().get<string>('webEndpoint', 'https://heyhuman.vercel.app').trim();
+  }
+
   // Temporary Mute State
   public muteForMinutes(minutes?: number): void {
     const mins = minutes ?? this.getTemporaryMuteDurationMinutes();
