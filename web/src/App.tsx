@@ -13,7 +13,9 @@ import {
   ExternalLink,
   Bell,
   BellOff,
-  Sun
+  Sun,
+  Terminal,
+  ArrowUpRight
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -423,86 +425,145 @@ export function App() {
           <div 
             className="alarm-active"
             style={{
-              background: 'linear-gradient(180deg, rgba(255, 59, 48, 0.15) 0%, rgba(18, 20, 28, 0.8) 100%)',
-              border: '1.5px solid var(--accent-red)',
-              borderRadius: '24px',
-              padding: '2rem 1.5rem',
-              textAlign: 'center',
+              background: 'radial-gradient(120% 120% at 50% 0%, rgba(255, 59, 48, 0.18) 0%, rgba(18, 20, 28, 0.95) 70%)',
+              backdropFilter: 'blur(30px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+              border: '1px solid rgba(255, 59, 48, 0.5)',
+              borderRadius: '26px',
+              padding: '1.75rem 1.4rem',
+              boxShadow: '0 20px 48px -10px rgba(0, 0, 0, 0.8), 0 0 30px rgba(255, 59, 48, 0.25)',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: '1.25rem'
+              gap: '1.25rem',
+              width: '100%',
+              maxWidth: '460px',
+              margin: '0 auto'
             }}
           >
-            <div style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              background: 'var(--accent-red)',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 0 30px rgba(255, 59, 48, 0.6)'
-            }}>
-              <ShieldAlert size={34} />
-            </div>
-
-            <div style={{ width: '100%', maxWidth: '440px' }}>
-              <span style={{
+            {/* Top Badges & Agent Status */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                background: 'rgba(255, 59, 48, 0.16)',
+                border: '1px solid rgba(255, 59, 48, 0.3)',
+                padding: '0.35rem 0.8rem',
+                borderRadius: '999px',
+                color: 'var(--accent-red)',
                 fontSize: '0.75rem',
                 fontWeight: 700,
-                letterSpacing: '0.08em',
-                color: 'var(--accent-red)',
+                letterSpacing: '0.04em',
                 textTransform: 'uppercase'
               }}>
-                {pendingAlert.agent}
+                <ShieldAlert size={14} />
+                <span>{pendingAlert.agent}</span>
+              </div>
+
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-3)', fontWeight: 500 }}>
+                {new Date(pendingAlert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               </span>
-              <h2 style={{ fontSize: '1.35rem', fontWeight: 800, marginTop: '0.2rem', letterSpacing: '-0.02em' }}>
-                Approval Required
+            </div>
+
+            {/* Core Header Text */}
+            <div style={{ textAlign: 'center', width: '100%' }}>
+              <h2 style={{
+                fontSize: '1.4rem',
+                fontWeight: 700,
+                letterSpacing: '-0.025em',
+                color: 'var(--text-1)',
+                lineHeight: '1.2'
+              }}>
+                Permission Required
               </h2>
-              <p style={{ fontSize: '0.88rem', color: 'var(--text-1)', marginTop: '0.35rem', lineHeight: '1.4' }}>
+              <p style={{
+                fontSize: '0.86rem',
+                color: 'var(--text-2)',
+                marginTop: '0.4rem',
+                lineHeight: '1.4',
+                fontWeight: 400
+              }}>
                 {pendingAlert.description}
               </p>
+            </div>
 
-              {/* Exact Command or Action awaiting permission */}
-              {pendingAlert.command && (
+            {/* Code / Command Inspection Terminal Block */}
+            {pendingAlert.command && (
+              <div style={{
+                width: '100%',
+                background: 'rgba(0, 0, 0, 0.55)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '14px',
+                overflow: 'hidden'
+              }}>
                 <div style={{
-                  marginTop: '0.85rem',
-                  background: 'rgba(0, 0, 0, 0.45)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '10px',
-                  padding: '0.65rem 0.85rem',
-                  textAlign: 'left'
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.45rem 0.8rem',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                  color: 'var(--text-3)',
+                  fontSize: '0.7rem',
+                  fontWeight: 600
                 }}>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.25rem' }}>
-                    Command / Action:
-                  </span>
+                  <Terminal size={12} />
+                  <span>Action / Command</span>
+                </div>
+                <div style={{ padding: '0.75rem 0.85rem', textAlign: 'left' }}>
                   <code style={{
-                    fontSize: '0.78rem',
+                    fontSize: '0.8rem',
                     color: '#38bdf8',
                     fontFamily: 'var(--font-mono)',
                     wordBreak: 'break-all',
                     display: 'block',
                     maxHeight: '120px',
-                    overflowY: 'auto'
+                    overflowY: 'auto',
+                    lineHeight: '1.45'
                   }}>
                     {pendingAlert.command}
                   </code>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', width: '100%', maxWidth: '340px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', width: '100%' }}>
+            {/* Primary Action Buttons (Apple Segmented Style) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', width: '100%' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.55rem', width: '100%' }}>
+                {/* Approve Primary Button */}
                 <button
                   onClick={() => handleRemoteAction(pendingAlert.id, 'approve')}
                   style={{
-                    background: 'var(--accent-green)',
+                    background: '#34c759',
                     color: '#000000',
                     border: 'none',
-                    borderRadius: '13px',
-                    padding: '0.8rem 1rem',
+                    borderRadius: '14px',
+                    padding: '0.85rem 1rem',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 18px rgba(52, 199, 89, 0.35)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <CheckCircle2 size={17} />
+                  Approve (y)
+                </button>
+
+                {/* Reject Button */}
+                <button
+                  onClick={() => handleRemoteAction(pendingAlert.id, 'reject')}
+                  style={{
+                    background: 'rgba(255, 59, 48, 0.12)',
+                    color: 'var(--accent-red)',
+                    border: '1px solid rgba(255, 59, 48, 0.25)',
+                    borderRadius: '14px',
+                    padding: '0.85rem 1rem',
                     fontSize: '0.88rem',
                     fontWeight: 700,
                     display: 'flex',
@@ -510,23 +571,27 @@ export function App() {
                     justifyContent: 'center',
                     gap: '0.35rem',
                     cursor: 'pointer',
-                    boxShadow: '0 4px 18px rgba(52, 199, 89, 0.35)'
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  <CheckCircle2 size={16} />
-                  Approve (y)
+                  Reject (n)
                 </button>
+              </div>
 
+              {/* Auxiliary Controls */}
+              <div style={{ display: 'flex', gap: '0.55rem', width: '100%' }}>
                 <button
-                  onClick={() => handleRemoteAction(pendingAlert.id, 'reject')}
+                  onClick={() => handleRemoteAction(pendingAlert.id, 'focus')}
+                  title="Raise desktop editor to foreground"
                   style={{
-                    background: 'rgba(255, 59, 48, 0.15)',
-                    color: 'var(--accent-red)',
-                    border: '1px solid rgba(255, 59, 48, 0.35)',
-                    borderRadius: '13px',
-                    padding: '0.8rem 1rem',
-                    fontSize: '0.88rem',
-                    fontWeight: 700,
+                    flex: 1,
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    color: 'var(--text-1)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '12px',
+                    padding: '0.65rem 0.8rem',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -534,34 +599,18 @@ export function App() {
                     cursor: 'pointer'
                   }}
                 >
-                  Reject (n)
+                  <span>🪟 Bring IDE to Front</span>
+                  <ArrowUpRight size={13} style={{ opacity: 0.6 }} />
                 </button>
-              </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
-                <button
-                  onClick={() => handleRemoteAction(pendingAlert.id, 'focus')}
-                  style={{
-                    flex: 1,
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    color: 'var(--text-1)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '11px',
-                    padding: '0.6rem 0.8rem',
-                    fontSize: '0.78rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  🪟 Bring IDE to Front
-                </button>
                 <button
                   onClick={() => handleResolve(pendingAlert.id)}
                   style={{
                     background: 'none',
                     color: 'var(--text-3)',
-                    border: 'none',
-                    padding: '0.6rem 0.8rem',
+                    border: '1px solid transparent',
+                    borderRadius: '12px',
+                    padding: '0.65rem 0.85rem',
                     fontSize: '0.78rem',
                     fontWeight: 500,
                     cursor: 'pointer'
