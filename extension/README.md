@@ -1,7 +1,7 @@
 # HeyHuman 🚨🤖
 
 <p align="center">
-  <img src="web/public/logo.svg" alt="HeyHuman Logo" width="120" height="120" />
+  <img src="media/logo.png" alt="HeyHuman Logo" width="120" height="120" />
 </p>
 
 <p align="center">
@@ -57,9 +57,7 @@ HeyHuman/
 
 For developers away from their desk, cooking, or on their phone where desktop sirens can't be heard:
 
-<p align="center">
-  <img src="web/public/logo.svg" width="60" alt="Relay">
-</p>
+
 
 ### Key Highlights
 - **PWA Installable**: Add to Home Screen on iOS Safari and Android Chrome.

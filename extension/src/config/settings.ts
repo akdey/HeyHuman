@@ -145,7 +145,7 @@ export class SettingsManager {
   }
 
   public getWebEndpoint(): string {
-    return this.getConfig().get<string>('webEndpoint', 'https://heyhuman.vercel.app').trim();
+    return this.getConfig().get<string>('webEndpoint', 'https://hey-human-akdey.vercel.app').trim();
   }
 
   // Temporary Mute State
