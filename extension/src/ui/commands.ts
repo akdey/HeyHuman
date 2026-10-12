@@ -108,6 +108,28 @@ export function registerCommands(
     })
   );
 
+  // 9. Interactive Set Web Room Dialog
+  context.subscriptions.push(
+    vscode.commands.registerCommand('heyhuman.setWebRoom', async () => {
+      const current = settings.getWebRoom();
+      const input = await vscode.window.showInputBox({
+        title: 'HeyHuman: Web Alert Room ID',
+        prompt: 'Enter your Room ID to stream alerts to your phone (leave empty to disable)',
+        value: current,
+        placeHolder: 'e.g. akdey or my-workspace'
+      });
+
+      if (input !== undefined) {
+        await settings.setWebRoom(input);
+        if (input.trim()) {
+          vscode.window.showInformationMessage(`📡 HeyHuman paired to Web Room: ${input.trim()}`);
+        } else {
+          vscode.window.showInformationMessage('📡 HeyHuman Web Room disabled.');
+        }
+      }
+    })
+  );
+
   // 9. Status Bar Quick Menu
   context.subscriptions.push(
     vscode.commands.registerCommand('heyhuman.showQuickMenu', async () => {
@@ -130,6 +152,10 @@ export function registerCommands(
         {
           label: '$(info) Detection Status & Diagnostics',
           description: 'View active detectors and connection states'
+        },
+        {
+          label: '$(broadcast) Pair Web Alert Room...',
+          description: settings.getWebRoom() ? `Currently paired to '${settings.getWebRoom()}'` : 'Stream sirens to your mobile phone'
         },
         {
           label: '$(gear) Configure Settings',
@@ -157,6 +183,8 @@ export function registerCommands(
         await vscode.commands.executeCommand('heyhuman.testSound');
       } else if (selection.label.includes('Detection Status')) {
         await vscode.commands.executeCommand('heyhuman.showStatus');
+      } else if (selection.label.includes('Pair Web Alert Room')) {
+        await vscode.commands.executeCommand('heyhuman.setWebRoom');
       } else if (selection.label.includes('Configure Settings')) {
         await vscode.commands.executeCommand('heyhuman.openSettings');
       }

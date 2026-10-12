@@ -140,6 +140,10 @@ export class SettingsManager {
     return this.getConfig().get<string>('webRoom', '').trim();
   }
 
+  public async setWebRoom(room: string): Promise<void> {
+    await this.getConfig().update('webRoom', room.trim(), vscode.ConfigurationTarget.Global);
+  }
+
   public getWebEndpoint(): string {
     return this.getConfig().get<string>('webEndpoint', 'https://heyhuman.vercel.app').trim();
   }

@@ -63,6 +63,10 @@
       {
         "command": "heyhuman.showStatus",
         "title": "HeyHuman: Show Detection Status"
+      },
+      {
+        "command": "heyhuman.setWebRoom",
+        "title": "HeyHuman: Set Web Room ID"
       }
     ],
     "configuration": {

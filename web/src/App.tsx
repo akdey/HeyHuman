@@ -6,19 +6,19 @@ import {
   ShieldAlert, 
   CheckCircle2, 
   Trash2, 
-  Terminal, 
   Copy, 
   Check, 
-  Smartphone,
-  Bot,
-  QrCode,
-  Shuffle,
-  Volume1,
-  ExternalLink,
-  Save,
-  BookmarkCheck,
-  HelpCircle,
-  Cpu
+  Smartphone, 
+  Bot, 
+  QrCode, 
+  Shuffle, 
+  Volume1, 
+  ExternalLink, 
+  BookmarkCheck, 
+  Save, 
+  Wrench, 
+  Sparkles,
+  Layers
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -35,8 +35,8 @@ interface AlertItem {
 }
 
 const STORAGE_KEY_ROOM = 'heyhuman_saved_room';
-const RANDOM_ADJECTIVES = ['hyper', 'swift', 'zero', 'cyber', 'silent', 'delta', 'vivid', 'quantum'];
-const RANDOM_NOUNS = ['lynx', 'falcon', 'matrix', 'beacon', 'badger', 'panther', 'nexus', 'pulse'];
+const RANDOM_ADJECTIVES = ['hyper', 'swift', 'zero', 'cyber', 'silent', 'delta', 'vivid', 'quantum', 'zen'];
+const RANDOM_NOUNS = ['lynx', 'falcon', 'matrix', 'beacon', 'badger', 'panther', 'nexus', 'pulse', 'orbit'];
 
 function generateRandomRoom(): string {
   const adj = RANDOM_ADJECTIVES[Math.floor(Math.random() * RANDOM_ADJECTIVES.length)];
@@ -50,7 +50,7 @@ export function App() {
   const paramRoom = searchParams.get('room');
   const savedRoom = localStorage.getItem(STORAGE_KEY_ROOM);
 
-  // Default to URL param > Saved Room > 'my-workspace'
+  // Auto-tune: URL param > Saved Room > 'my-workspace'
   const initialRoom = paramRoom || savedRoom || 'my-workspace';
 
   const [room, setRoom] = useState<string>(initialRoom);
@@ -59,13 +59,15 @@ export function App() {
   const [isAudioEnabled, setIsAudioEnabled] = useState<boolean>(false);
   const [soundType, setSoundType] = useState<'siren' | 'alarm' | 'chime' | 'beep'>('siren');
   const [isSpeechEnabled, setIsSpeechEnabled] = useState<boolean>(true);
-  const [isCopied, setIsCopied] = useState<boolean>(false);
   const [isSettingCopied, setIsSettingCopied] = useState<boolean>(false);
   const [isTesting, setIsTesting] = useState<boolean>(false);
   const [isFlashing, setIsFlashing] = useState<boolean>(false);
   const [showQR, setShowQR] = useState<boolean>(false);
-  const [showHelp, setShowHelp] = useState<boolean>(false);
   const [activePendingCount, setActivePendingCount] = useState<number>(0);
+
+  // Diagnostics & Troubleshoot State
+  const [showTroubleshoot, setShowTroubleshoot] = useState<boolean>(false);
+  const [lastPingStatus, setLastPingStatus] = useState<'idle' | 'checking' | 'healthy' | 'error'>('idle');
 
   const lastSeenIdRef = useRef<string | null>(null);
   const pollerRef = useRef<number | null>(null);
@@ -91,9 +93,10 @@ export function App() {
     localStorage.setItem(STORAGE_KEY_ROOM, room);
     setSavedStatus(true);
     confetti({
-      particleCount: 25,
-      spread: 45,
-      origin: { y: 0.3 }
+      particleCount: 30,
+      spread: 50,
+      origin: { y: 0.25 },
+      colors: ['#06b6d4', '#3b82f6', '#ffffff']
     });
   };
 
@@ -151,7 +154,7 @@ export function App() {
     }
 
     if ('vibrate' in navigator) {
-      navigator.vibrate([300, 150, 300, 150, 500]);
+      navigator.vibrate([350, 150, 350, 150, 500]);
     }
 
     if ('Notification' in window && Notification.permission === 'granted') {
@@ -204,6 +207,20 @@ export function App() {
     setTimeout(() => setIsTesting(false), 1400);
   };
 
+  const handleRunTroubleshoot = async () => {
+    setLastPingStatus('checking');
+    try {
+      const res = await fetch(`/api/alert?room=${encodeURIComponent(room)}`);
+      if (res.ok) {
+        setLastPingStatus('healthy');
+      } else {
+        setLastPingStatus('error');
+      }
+    } catch {
+      setLastPingStatus('error');
+    }
+  };
+
   const handleResolve = async (id: string) => {
     confetti({
       particleCount: 50,
@@ -241,18 +258,8 @@ export function App() {
     }
   };
 
-  const webhookCurlExample = `curl -X POST "${window.location.origin}/api/alert?room=${room}" \\
-  -H "Content-Type: application/json" \\
-  -d '{"agent":"Claude Code","tool":"Terminal","description":"Permission needed"}'`;
-
-  const copyWebhook = () => {
-    navigator.clipboard.writeText(webhookCurlExample);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
-  };
-
-  const copySettingSnippet = () => {
-    navigator.clipboard.writeText(`"heyhuman.webRoom": "${room}"`);
+  const copyRoomIdOnly = () => {
+    navigator.clipboard.writeText(room);
     setIsSettingCopied(true);
     setTimeout(() => setIsSettingCopied(false), 2000);
   };
@@ -263,8 +270,8 @@ export function App() {
       {/* Mobile Audio Activation Bar */}
       {!isAudioEnabled && (
         <div style={{
-          backgroundColor: '#1d283a',
-          borderBottom: '1px solid rgba(59, 130, 246, 0.3)',
+          backgroundColor: '#111827',
+          borderBottom: '1px solid rgba(59, 130, 246, 0.25)',
           color: '#e2e8f0',
           padding: '0.65rem 1rem',
           textAlign: 'center',
@@ -276,7 +283,7 @@ export function App() {
           fontWeight: 500
         }}>
           <Smartphone size={16} color="#60a5fa" />
-          <span>Tap to unlock audio sirens and voice speech on this device</span>
+          <span>Tap to unlock sound sirens & voice speech on this phone</span>
           <button 
             onClick={enableAudio}
             className="interactive-hover"
@@ -318,11 +325,11 @@ export function App() {
           {/* Brand */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
             <div style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.15), rgba(59, 130, 246, 0.15))',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              width: '40px',
+              height: '40px',
+              borderRadius: '11px',
+              background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.12), rgba(59, 130, 246, 0.12))',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -332,7 +339,7 @@ export function App() {
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.03em', color: '#ffffff' }}>HeyHuman</span>
+                <span style={{ fontSize: '1.2rem', fontWeight: 800, letterSpacing: '-0.03em', color: '#ffffff' }}>HeyHuman</span>
                 <span style={{
                   fontSize: '0.65rem',
                   fontWeight: 700,
@@ -346,7 +353,7 @@ export function App() {
                   RELAY
                 </span>
               </div>
-              <p style={{ fontSize: '0.73rem', color: 'var(--text-subtle)', fontWeight: 500 }}>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', fontWeight: 500 }}>
                 Audible siren when your autonomous AI agent needs your approval
               </p>
             </div>
@@ -355,15 +362,15 @@ export function App() {
           {/* Quick Header Actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <button
-              onClick={() => setShowHelp(!showHelp)}
+              onClick={() => setShowTroubleshoot(!showTroubleshoot)}
               className="interactive-hover"
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.35rem',
-                padding: '0.45rem 0.75rem',
-                background: showHelp ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-secondary)',
-                color: showHelp ? '#60a5fa' : 'var(--text-muted)',
+                padding: '0.45rem 0.8rem',
+                background: showTroubleshoot ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-secondary)',
+                color: showTroubleshoot ? '#60a5fa' : 'var(--text-muted)',
                 border: '1px solid var(--border)',
                 borderRadius: '8px',
                 cursor: 'pointer',
@@ -371,8 +378,8 @@ export function App() {
                 fontWeight: 600
               }}
             >
-              <HelpCircle size={15} />
-              Setup Guide
+              <Wrench size={15} />
+              Troubleshoot
             </button>
 
             <button
@@ -433,53 +440,60 @@ export function App() {
         gap: '1.5rem'
       }}>
 
-        {/* Step-by-Step Multi-Agent Guide (Expandable Modal / Card) */}
-        {showHelp && (
+        {/* Diagnostics & Troubleshoot Panel */}
+        {showTroubleshoot && (
           <div className="glass-panel" style={{
             borderRadius: '14px',
-            padding: '1.5rem',
-            border: '1px solid #3b82f6',
+            padding: '1.35rem',
+            border: '1px solid rgba(59, 130, 246, 0.4)',
             background: 'rgba(15, 23, 42, 0.95)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Cpu size={20} color="#60a5fa" />
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff' }}>
-                  How to Connect Any AI Agent (Antigravity, Copilot, Claude, Cursor, Aider)
+                <Wrench size={18} color="#60a5fa" />
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#ffffff' }}>
+                  Connection & Room Diagnostics
                 </h3>
               </div>
               <button
-                onClick={() => setShowHelp(false)}
+                onClick={() => setShowTroubleshoot(false)}
                 style={{ background: 'none', border: 'none', color: 'var(--text-subtle)', cursor: 'pointer', fontSize: '0.85rem' }}
               >
                 ✕ Close
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-              {/* Option A: Extension */}
-              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#10b981', textTransform: 'uppercase' }}>Method 1: VS Code / Antigravity</span>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, margin: '0.3rem 0' }}>HeyHuman Extension</h4>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                  The extension watches <strong>Antigravity</strong>, <strong>GitHub Copilot</strong>, <strong>Cursor</strong>, <strong>Claude</strong>, and <strong>Aider</strong> automatically!
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+              <div style={{ background: 'var(--bg-secondary)', padding: '0.9rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-subtle)', fontWeight: 600 }}>Active Channel:</span>
+                <p className="mono" style={{ fontSize: '0.9rem', color: '#06b6d4', fontWeight: 600, marginTop: '0.2rem' }}>{room}</p>
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                  {savedStatus ? '✓ Saved as your default room.' : 'Not saved yet. Tap "Save as Default" to remember.'}
                 </p>
-                <ol style={{ fontSize: '0.78rem', color: 'var(--text-main)', paddingLeft: '1.1rem', lineHeight: '1.5' }}>
-                  <li>Open <code>settings.json</code> in your IDE.</li>
-                  <li>Add your room: <code className="mono" style={{ color: '#06b6d4' }}>"heyhuman.webRoom": "{room}"</code></li>
-                  <li>Whenever ANY agent requests permission, your phone sirens instantly!</li>
-                </ol>
               </div>
 
-              {/* Option B: Terminal CLI Agents */}
-              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase' }}>Method 2: Standalone CLI / Terminal</span>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, margin: '0.3rem 0' }}>Claude Code & Aider CLI</h4>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                  Using Claude Code CLI or Aider outside of VS Code? Simply send a 1-line curl webhook:
-                </p>
-                <div style={{ background: '#0a0d14', padding: '0.6rem', borderRadius: '6px', fontSize: '0.73rem', color: '#38bdf8', overflowX: 'auto' }}>
-                  <code className="mono">curl -s -X POST "{window.location.origin}/api/alert?room={room}" -d '&#123;"agent":"Claude"&#125;'</code>
+              <div style={{ background: 'var(--bg-secondary)', padding: '0.9rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-subtle)', fontWeight: 600 }}>Relay Health Check:</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem' }}>
+                  <button
+                    onClick={handleRunTroubleshoot}
+                    disabled={lastPingStatus === 'checking'}
+                    className="interactive-hover"
+                    style={{
+                      background: 'rgba(59, 130, 246, 0.2)',
+                      color: '#60a5fa',
+                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      borderRadius: '6px',
+                      padding: '0.3rem 0.75rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {lastPingStatus === 'checking' ? 'Pinging...' : 'Ping Relay Server'}
+                  </button>
+                  {lastPingStatus === 'healthy' && <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>● Connected OK</span>}
+                  {lastPingStatus === 'error' && <span style={{ fontSize: '0.75rem', color: '#f43f5e', fontWeight: 600 }}>● Connection Failed</span>}
                 </div>
               </div>
             </div>
@@ -557,7 +571,7 @@ export function App() {
           </div>
         )}
 
-        {/* Workspace Tuning & Controls */}
+        {/* Workspace Room Pairing Card */}
         <section className="glass-panel" style={{
           borderRadius: '14px',
           padding: '1.35rem',
@@ -565,7 +579,7 @@ export function App() {
           gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
           gap: '1.5rem'
         }}>
-          {/* Room Configuration with Save / Default feature */}
+          {/* Room Configuration */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
               <label style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -662,22 +676,34 @@ export function App() {
               </button>
             </div>
 
-            {/* QR Code Card */}
+            {/* QR Code Card with Centered Robot Logo in the middle */}
             {showQR && (
               <div style={{
                 marginTop: '1rem',
                 background: '#ffffff',
                 padding: '1.25rem',
-                borderRadius: '10px',
+                borderRadius: '12px',
                 display: 'inline-flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '0.6rem',
+                gap: '0.65rem',
                 boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
               }}>
-                <QRCodeSVG value={roomUrl} size={150} />
+                <QRCodeSVG 
+                  value={roomUrl} 
+                  size={160}
+                  level="H"
+                  imageSettings={{
+                    src: '/logo.svg',
+                    x: undefined,
+                    y: undefined,
+                    height: 36,
+                    width: 36,
+                    excavate: true,
+                  }}
+                />
                 <span style={{ color: '#0f172a', fontSize: '0.75rem', fontWeight: 700 }}>
-                  Scan with mobile camera to open room
+                  Scan with phone camera to open room
                 </span>
               </div>
             )}
@@ -697,7 +723,7 @@ export function App() {
             </div>
           </div>
 
-          {/* Sound Profile & Extension Quick Copy */}
+          {/* Sound Profile & 1-Click Extension Setup */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
               <label style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -706,7 +732,7 @@ export function App() {
               </label>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
               {(['siren', 'alarm', 'chime', 'beep'] as const).map(type => (
                 <button
                   key={type}
@@ -748,20 +774,27 @@ export function App() {
               </button>
             </div>
 
-            {/* Extension Setting Copy Box with Explanation */}
-            <div style={{ background: 'var(--bg-secondary)', padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8' }}>VS Code / Antigravity Config:</span>
+            {/* Frictionless 1-Click Setup Box for Extension */}
+            <div style={{ 
+              background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(59, 130, 246, 0.08))', 
+              padding: '0.85rem', 
+              borderRadius: '9px', 
+              border: '1px solid rgba(6, 182, 212, 0.25)' 
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <Sparkles size={13} /> Pair with VS Code / Antigravity
+                </span>
                 <button
-                  onClick={copySettingSnippet}
+                  onClick={copyRoomIdOnly}
                   className="interactive-hover"
                   style={{
-                    background: 'rgba(59, 130, 246, 0.2)',
-                    color: '#60a5fa',
-                    border: '1px solid rgba(59, 130, 246, 0.35)',
+                    background: '#06b6d4',
+                    color: '#000000',
+                    border: 'none',
                     borderRadius: '5px',
-                    padding: '0.15rem 0.45rem',
-                    fontSize: '0.7rem',
+                    padding: '0.2rem 0.55rem',
+                    fontSize: '0.72rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                     display: 'flex',
@@ -769,36 +802,36 @@ export function App() {
                     gap: '0.25rem'
                   }}
                 >
-                  {isSettingCopied ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
-                  {isSettingCopied ? 'Copied' : 'Copy'}
+                  {isSettingCopied ? <Check size={12} /> : <Copy size={12} />}
+                  {isSettingCopied ? 'Copied Room!' : 'Copy Room ID'}
                 </button>
               </div>
-              <code className="mono" style={{ fontSize: '0.75rem', color: '#06b6d4', display: 'block' }}>
-                "heyhuman.webRoom": "{room}"
-              </code>
-              <p style={{ fontSize: '0.68rem', color: 'var(--text-subtle)', marginTop: '0.25rem' }}>
-                Paste into your editor's <code>settings.json</code> to stream all AI approvals to this tab.
-              </p>
+              <div style={{ fontSize: '0.76rem', color: 'var(--text-main)', lineHeight: '1.4' }}>
+                Press <code className="mono" style={{ color: '#ffffff', background: 'rgba(0,0,0,0.4)', padding: '0.1rem 0.35rem', borderRadius: '4px' }}>Cmd+Shift+P</code> in your IDE &rarr; choose <strong>HeyHuman: Set Web Room ID</strong> &rarr; paste <code className="mono" style={{ color: '#38bdf8', fontWeight: 700 }}>{room}</code>.
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Multi-Agent Support Badges */}
+        {/* Multi-Agent Support Bar */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '0.5rem',
-          padding: '0.75rem 1rem',
-          borderRadius: '10px',
-          background: 'rgba(18, 24, 36, 0.5)',
+          gap: '0.6rem',
+          padding: '0.85rem 1.1rem',
+          borderRadius: '11px',
+          background: 'rgba(18, 24, 36, 0.6)',
           border: '1px solid var(--border)'
         }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', fontWeight: 600 }}>
-            Watched AI Agents & Tools:
-          </span>
-          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <Layers size={16} color="#94a3b8" />
+            <span style={{ fontSize: '0.78rem', color: '#ffffff', fontWeight: 700 }}>
+              Autonomous Agents Monitored:
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
             {[
               { name: 'Google Antigravity', color: '#38bdf8' },
               { name: 'GitHub Copilot', color: '#a78bfa' },
@@ -809,12 +842,12 @@ export function App() {
               <span 
                 key={agent.name}
                 style={{
-                  fontSize: '0.7rem',
+                  fontSize: '0.72rem',
                   fontWeight: 600,
                   color: agent.color,
                   background: 'var(--bg-secondary)',
                   border: '1px solid var(--border)',
-                  padding: '0.15rem 0.5rem',
+                  padding: '0.18rem 0.55rem',
                   borderRadius: '999px'
                 }}
               >
@@ -944,55 +977,6 @@ export function App() {
               ))}
             </div>
           )}
-        </section>
-
-        {/* Integration Snippet */}
-        <section className="glass-panel" style={{
-          borderRadius: '14px',
-          padding: '1.25rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <h3 style={{ fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#ffffff' }}>
-              <Terminal size={15} color="#06b6d4" />
-              Direct Webhook Hook (Claude Code / Aider / Cursor / Shell)
-            </h3>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>HTTP POST</span>
-          </div>
-
-          <div style={{
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: '9px',
-            padding: '0.85rem 1rem',
-            position: 'relative',
-            fontSize: '0.76rem',
-            color: '#38bdf8',
-            overflowX: 'auto'
-          }}>
-            <button
-              onClick={copyWebhook}
-              className="interactive-hover"
-              style={{
-                position: 'absolute',
-                top: '0.5rem',
-                right: '0.5rem',
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border)',
-                borderRadius: '6px',
-                padding: '0.25rem 0.55rem',
-                color: 'var(--text-main)',
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem'
-              }}
-            >
-              {isCopied ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
-              {isCopied ? 'Copied' : 'Copy'}
-            </button>
-            <pre className="mono" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{webhookCurlExample}</pre>
-          </div>
         </section>
       </main>
 
