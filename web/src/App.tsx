@@ -415,7 +415,17 @@ export function App() {
             </button>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.45rem' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            background: 'var(--surface-raised)',
+            border: '1px solid var(--border)',
+            borderRadius: '14px',
+            padding: '0.25rem 0.35rem 0.25rem 0.85rem',
+            gap: '0.4rem',
+            width: '100%',
+            boxSizing: 'border-box'
+          }}>
             <input 
               type="text"
               value={room}
@@ -423,24 +433,26 @@ export function App() {
               placeholder="room-name"
               style={{
                 flex: 1,
-                background: 'var(--surface-raised)',
-                border: '1px solid var(--border)',
-                borderRadius: '12px',
-                padding: '0.65rem 0.9rem',
+                minWidth: 0,
+                background: 'transparent',
+                border: 'none',
                 color: '#ffffff',
                 fontSize: '0.95rem',
                 fontWeight: 600,
-                outline: 'none'
+                outline: 'none',
+                padding: '0.4rem 0'
               }}
             />
             <button
               onClick={() => updateRoom(generateRandomKey())}
               title="Rotate / Generate New Key"
               style={{
-                background: 'var(--surface-raised)',
+                background: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid var(--border)',
-                borderRadius: '12px',
-                padding: '0 0.8rem',
+                borderRadius: '9px',
+                width: '34px',
+                height: '34px',
+                flexShrink: 0,
                 color: 'var(--text-2)',
                 cursor: 'pointer',
                 display: 'flex',
@@ -448,25 +460,28 @@ export function App() {
                 justifyContent: 'center'
               }}
             >
-              <RefreshCw size={14} />
+              <RefreshCw size={13} />
             </button>
             <button
               onClick={copyRoom}
               style={{
-                background: 'var(--surface-raised)',
-                border: '1px solid var(--border)',
-                borderRadius: '12px',
-                padding: '0 1rem',
-                color: 'var(--text-1)',
-                fontSize: '0.8rem',
+                background: isCopied ? 'rgba(52, 199, 89, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                border: `1px solid ${isCopied ? 'rgba(52, 199, 89, 0.3)' : 'var(--border)'}`,
+                borderRadius: '9px',
+                height: '34px',
+                padding: '0 0.85rem',
+                flexShrink: 0,
+                color: isCopied ? 'var(--accent-green)' : 'var(--text-1)',
+                fontSize: '0.78rem',
                 fontWeight: 600,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.35rem',
-                cursor: 'pointer'
+                gap: '0.3rem',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
               }}
             >
-              {isCopied ? <Check size={14} color="var(--accent-green)" /> : <Copy size={14} />}
+              {isCopied ? <Check size={13} color="var(--accent-green)" /> : <Copy size={13} />}
               {isCopied ? 'Copied' : 'Copy'}
             </button>
           </div>
