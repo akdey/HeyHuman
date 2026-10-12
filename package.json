@@ -2,7 +2,7 @@
   "name": "heyhuman",
   "displayName": "HeyHuman",
   "description": "Your AI is waiting. Permission required. Audible alerts when AI coding agents need your approval.",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "publisher": "heyhuman",
   "license": "MIT",
   "repository": {
@@ -81,6 +81,21 @@
           "type": "boolean",
           "default": true,
           "description": "Enable alerts for Google Antigravity permission prompts."
+        },
+        "heyhuman.agents.claude.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable alerts for Claude Code permission prompts."
+        },
+        "heyhuman.agents.cursor.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable alerts for Cursor Agent confirmation prompts."
+        },
+        "heyhuman.agents.aider.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable alerts for Aider confirmation prompts."
         },
         "heyhuman.sound.enabled": {
           "type": "boolean",

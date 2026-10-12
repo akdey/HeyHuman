@@ -23,7 +23,13 @@ export class NotificationManager {
       ? 'GitHub Copilot' 
       : event.agent === 'antigravity' 
         ? 'Google Antigravity' 
-        : 'AI Agent';
+        : event.agent === 'claude'
+          ? 'Claude Code'
+          : event.agent === 'cursor'
+            ? 'Cursor Agent'
+            : event.agent === 'aider'
+              ? 'Aider'
+              : 'AI Agent';
 
     const shortSummary = event.summary ? `: ${event.summary}` : '';
     const message = `🚨 HeyHuman! ${agentTitle} needs your permission${shortSummary}`;

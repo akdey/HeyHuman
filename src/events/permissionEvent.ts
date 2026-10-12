@@ -3,7 +3,7 @@
  * Defines normalized event models for AI agent permission requests.
  */
 
-export type AgentType = 'copilot' | 'antigravity' | 'custom';
+export type AgentType = 'copilot' | 'antigravity' | 'claude' | 'cursor' | 'aider' | 'custom';
 
 export type PermissionType = 
   | 'terminal_command' 

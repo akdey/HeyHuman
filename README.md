@@ -11,7 +11,7 @@
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-v1.85+-blue.svg?logo=visualstudiocode)](https://marketplace.visualstudio.com/)
 [![TypeScript](https://img.shields.io/badge/Language-TypeScript%205.4-blue.svg?logo=typescript)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests Passing](https://img.shields.io/badge/Tests-24%2F24%20Passing-brightgreen.svg)]()
+[![Tests Passing](https://img.shields.io/badge/Tests-30%2F30%20Passing-brightgreen.svg)]()
 
 </div>
 
@@ -41,11 +41,17 @@ flowchart TD
     subgraph Agents ["Target AI Agents"]
         Copilot["GitHub Copilot<br/>(Chat / Agent Mode)"]
         Antigravity["Google Antigravity<br/>(IDE / 2.0 Desktop)"]
+        Claude["Claude Code<br/>(Anthropic CLI)"]
+        Cursor["Cursor Agent<br/>(IDE / Composer)"]
+        Aider["Aider<br/>(Terminal / Chat History)"]
     end
 
     subgraph Detectors ["HeyHuman Detection Adapters"]
         CD["CopilotDetector<br/>(Workspace & Log Monitor)"]
         AGD["AntigravityDetector<br/>(JSONL Transcript + Port 47291)"]
+        CLD["ClaudeDetector<br/>(CLI Sessions & Terminal Logs)"]
+        CURD["CursorDetector<br/>(Cursor Workspace Storage)"]
+        AIDD["AiderDetector<br/>(.aider.chat.history.md Monitor)"]
     end
 
     subgraph Core ["HeyHuman Core Engine"]
@@ -61,8 +67,14 @@ flowchart TD
 
     Copilot --> CD
     Antigravity --> AGD
+    Claude --> CLD
+    Cursor --> CURD
+    Aider --> AIDD
     CD -->|PermissionEvent| PT
     AGD -->|PermissionEvent| PT
+    CLD -->|PermissionEvent| PT
+    CURD -->|PermissionEvent| PT
+    AIDD -->|PermissionEvent| PT
     PT -->|isNewAlert: true| AM
     AM --> AP
     AM --> NM
@@ -77,6 +89,9 @@ flowchart TD
 | :--- | :--- | :--- | :--- |
 | **GitHub Copilot** | VS Code / Copilot Agent Mode | Log & Workspace Storage Observation (`workspaceStorage/<id>/GitHub.copilot-chat/`, `~/.copilot/logs`) | • Terminal execution approval prompts<br>• Custom tool confirmations (`prepareInvocation`)<br>• Script sandbox approval dialogs |
 | **Google Antigravity** | Antigravity IDE & Antigravity 2.0 Desktop | Real-time JSONL Transcript Monitor (`~/.gemini/antigravity/brain/.../transcript.jsonl`) + Companion Port (`47291`) | • Sandbox bypass approvals (`BypassSandbox: true`)<br>• Clarification questionnaires (`ask_question`)<br>• Steps blocked on user input (`WAITING_FOR_INPUT`) |
+| **Claude Code** | Anthropic `claude` CLI / Terminal Sessions | CLI Session & Project Logs Monitor (`~/.claude/sessions/`, `~/.claude/logs/`) | • Bash command confirmation prompts (`[Y/n]`)<br>• Tool execution approval requests<br>• File change confirmations |
+| **Cursor Agent** | Cursor IDE & Composer | Cursor Workspace Storage Observation (`~/Library/Application Support/Cursor/...`) | • Terminal command approval gates<br>• Composer action confirmations<br>• File modification permissions |
+| **Aider** | Aider Terminal & Workspace | Live Chat History Monitor (`.aider.chat.history.md`) | • Shell command execution approvals (`(Y)es/(N)o`)<br>• Code modification approvals |
 
 ---
 
@@ -153,12 +168,12 @@ Click the status bar item at any time to open the **Quick Menu**.
 
 Here are the upcoming enhancements planned for the HeyHuman project:
 
-### 1. Extended Agent Support
-- [ ] **Claude Code (Anthropic CLI)**: Integrate with `claude` CLI terminal sessions to alert when bash commands or file edits request confirmation.
-- [ ] **Cursor & Windsurf**: Adapters for Cursor Agent mode and Codeium Windsurf Cascade approval prompts.
-- [ ] **Aider & Goose**: File-watcher hooks for open-source autonomous terminal coding agents.
+### 1. Extended Agent Support (✅ Delivered in v1.1.0)
+- [x] **Claude Code (Anthropic CLI)**: Real-time detection for `claude` CLI terminal sessions and approval prompts (`[Y/n]`).
+- [x] **Cursor Agent & Windsurf**: Adapters for Cursor workspace storage and Composer confirmation gates.
+- [x] **Aider**: Live chat history monitor for `.aider.chat.history.md` shell execution and file edit approvals.
 
-### 2. Multi-Device & Mobile Push Notifications
+### 2. Multi-Device & Mobile Push Notifications (Active Priority)
 - [ ] **Pushover / ntfy.sh Integration**: Send push notifications directly to your phone or Apple Watch when an agent is waiting, so you can step away from your desk entirely.
 - [ ] **Discord / Slack Webhooks**: Notify your private channel or direct message when long-running agent tasks hit a permission gate.
 

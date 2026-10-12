@@ -48,6 +48,15 @@ export class SettingsManager {
     if (agent === 'antigravity') {
       return this.getConfig().get<boolean>('agents.antigravity.enabled', true);
     }
+    if (agent === 'claude') {
+      return this.getConfig().get<boolean>('agents.claude.enabled', true);
+    }
+    if (agent === 'cursor') {
+      return this.getConfig().get<boolean>('agents.cursor.enabled', true);
+    }
+    if (agent === 'aider') {
+      return this.getConfig().get<boolean>('agents.aider.enabled', true);
+    }
     return true;
   }
 
@@ -56,6 +65,12 @@ export class SettingsManager {
       await this.getConfig().update('agents.copilot.enabled', value, vscode.ConfigurationTarget.Global);
     } else if (agent === 'antigravity') {
       await this.getConfig().update('agents.antigravity.enabled', value, vscode.ConfigurationTarget.Global);
+    } else if (agent === 'claude') {
+      await this.getConfig().update('agents.claude.enabled', value, vscode.ConfigurationTarget.Global);
+    } else if (agent === 'cursor') {
+      await this.getConfig().update('agents.cursor.enabled', value, vscode.ConfigurationTarget.Global);
+    } else if (agent === 'aider') {
+      await this.getConfig().update('agents.aider.enabled', value, vscode.ConfigurationTarget.Global);
     }
   }
 
@@ -106,6 +121,18 @@ export class SettingsManager {
 
   public getCopilotCustomLogPath(): string {
     return this.getConfig().get<string>('copilot.customLogPath', '').trim();
+  }
+
+  public getClaudeCustomLogPath(): string {
+    return this.getConfig().get<string>('claude.customLogPath', '').trim();
+  }
+
+  public getCursorCustomLogPath(): string {
+    return this.getConfig().get<string>('cursor.customLogPath', '').trim();
+  }
+
+  public getAiderCustomLogPath(): string {
+    return this.getConfig().get<string>('aider.customLogPath', '').trim();
   }
 
   // Temporary Mute State

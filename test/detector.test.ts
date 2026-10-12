@@ -2,6 +2,9 @@ import './mockVscode';
 import * as assert from 'assert';
 import { CopilotDetector } from '../src/detectors/copilotDetector';
 import { AntigravityDetector } from '../src/detectors/antigravityDetector';
+import { ClaudeDetector } from '../src/detectors/claudeDetector';
+import { CursorDetector } from '../src/detectors/cursorDetector';
+import { AiderDetector } from '../src/detectors/aiderDetector';
 import { PermissionEvent } from '../src/events/permissionEvent';
 
 describe('Agent Detectors', () => {
@@ -194,6 +197,116 @@ describe('Agent Detectors', () => {
         detector.parseTranscriptChunk('not valid json\n{partial\n', '/mock/transcript.jsonl');
       });
       assert.strictEqual(detectedEvents.length, 0);
+    });
+  });
+
+  describe('ClaudeDetector', () => {
+    let detector: ClaudeDetector;
+    let detectedEvents: PermissionEvent[] = [];
+    let resolvedEvents: { id: string; agent: string }[] = [];
+
+    beforeEach(() => {
+      detectedEvents = [];
+      resolvedEvents = [];
+      detector = new ClaudeDetector();
+      detector.onPermissionDetected(e => detectedEvents.push(e));
+      detector.onPermissionResolved(e => resolvedEvents.push(e));
+    });
+
+    afterEach(() => {
+      detector.dispose();
+    });
+
+    it('detects Claude Code command approval prompt', () => {
+      const line = 'Claude wants to execute bash command: "npm test". Do you want to run this command? [Y/n]';
+      detector.analyzeLogChunk(line, '/mock/claude.log');
+
+      assert.strictEqual(detectedEvents.length, 1);
+      assert.strictEqual(detectedEvents[0].agent, 'claude');
+      assert.strictEqual(detectedEvents[0].type, 'terminal_command');
+      assert.ok(detectedEvents[0].summary.includes('Approve'));
+    });
+
+    it('detects resolution when command completes or user confirms', () => {
+      detector.analyzeLogChunk('Do you want to run this command? [y/n]', '/mock/claude.log');
+      assert.strictEqual(detectedEvents.length, 1);
+
+      detector.analyzeLogChunk('command executed successfully', '/mock/claude.log');
+      assert.strictEqual(resolvedEvents.length, 1);
+      assert.strictEqual(resolvedEvents[0].agent, 'claude');
+    });
+  });
+
+  describe('CursorDetector', () => {
+    let detector: CursorDetector;
+    let detectedEvents: PermissionEvent[] = [];
+    let resolvedEvents: { id: string; agent: string }[] = [];
+
+    beforeEach(() => {
+      detectedEvents = [];
+      resolvedEvents = [];
+      detector = new CursorDetector();
+      detector.onPermissionDetected(e => detectedEvents.push(e));
+      detector.onPermissionResolved(e => resolvedEvents.push(e));
+    });
+
+    afterEach(() => {
+      detector.dispose();
+    });
+
+    it('detects Cursor Agent confirmation prompt', () => {
+      const line = 'cursor: waiting for approval to run in terminal action="make build"';
+      detector.analyzeLogChunk(line, '/mock/cursor.log');
+
+      assert.strictEqual(detectedEvents.length, 1);
+      assert.strictEqual(detectedEvents[0].agent, 'cursor');
+      assert.strictEqual(detectedEvents[0].type, 'terminal_command');
+    });
+
+    it('detects Cursor permission resolution', () => {
+      detector.analyzeLogChunk('cursor: waiting for approval to execute tool', '/mock/cursor.log');
+      assert.strictEqual(detectedEvents.length, 1);
+
+      detector.analyzeLogChunk('cursor: user approved action', '/mock/cursor.log');
+      assert.strictEqual(resolvedEvents.length, 1);
+      assert.strictEqual(resolvedEvents[0].agent, 'cursor');
+    });
+  });
+
+  describe('AiderDetector', () => {
+    let detector: AiderDetector;
+    let detectedEvents: PermissionEvent[] = [];
+    let resolvedEvents: { id: string; agent: string }[] = [];
+
+    beforeEach(() => {
+      detectedEvents = [];
+      resolvedEvents = [];
+      detector = new AiderDetector();
+      detector.onPermissionDetected(e => detectedEvents.push(e));
+      detector.onPermissionResolved(e => resolvedEvents.push(e));
+    });
+
+    afterEach(() => {
+      detector.dispose();
+    });
+
+    it('detects Aider shell command execution prompt', () => {
+      const line = 'Run shell command? (Y)es/(N)o [Yes]: `git commit -m "update"`';
+      detector.analyzeLogChunk(line, '/mock/.aider.chat.history.md');
+
+      assert.strictEqual(detectedEvents.length, 1);
+      assert.strictEqual(detectedEvents[0].agent, 'aider');
+      assert.strictEqual(detectedEvents[0].type, 'terminal_command');
+      assert.ok(detectedEvents[0].summary.includes('Aider'));
+    });
+
+    it('detects Aider resolution when changes are applied', () => {
+      detector.analyzeLogChunk('Apply changes? (Y)es/(N)o [Yes]:', '/mock/.aider.chat.history.md');
+      assert.strictEqual(detectedEvents.length, 1);
+
+      detector.analyzeLogChunk('Applied changes to src/file.ts', '/mock/.aider.chat.history.md');
+      assert.strictEqual(resolvedEvents.length, 1);
+      assert.strictEqual(resolvedEvents[0].agent, 'aider');
     });
   });
 });

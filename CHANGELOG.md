@@ -2,6 +2,15 @@
 
 All notable changes to the "heyhuman" extension will be documented in this file.
 
+## [1.1.0] - 2026-10-12
+
+### Added
+- **Claude Code Support**: Added `ClaudeDetector` to monitor Anthropic's `claude` CLI terminal sessions and approval prompts (`[Y/n]`).
+- **Cursor Agent Support**: Added `CursorDetector` observing Cursor's workspace storage and Composer confirmation dialogs.
+- **Aider Support**: Added `AiderDetector` observing `.aider.chat.history.md` for shell execution and code change approvals.
+- **Agent Toggles**: Added settings `heyhuman.agents.claude.enabled`, `heyhuman.agents.cursor.enabled`, and `heyhuman.agents.aider.enabled` with individual toggles.
+- **30 Comprehensive Unit Tests**: Expanded test suite covering detection and resolution lifecycle across all 5 AI coding agents.
+
 ## [1.0.1] - 2026-10-12
 
 ### Fixed

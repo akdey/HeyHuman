@@ -6,6 +6,9 @@ import { AlertManager } from './alerts/alertManager';
 import { PermissionTracker } from './events/permissionTracker';
 import { CopilotDetector } from './detectors/copilotDetector';
 import { AntigravityDetector } from './detectors/antigravityDetector';
+import { ClaudeDetector } from './detectors/claudeDetector';
+import { CursorDetector } from './detectors/cursorDetector';
+import { AiderDetector } from './detectors/aiderDetector';
 import { StatusBarController } from './ui/statusBar';
 import { registerCommands } from './ui/commands';
 import { IAgentDetector } from './detectors/detectorTypes';
@@ -47,7 +50,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // 3. Initialize Detectors
   const copilotDetector = new CopilotDetector(context);
   const antigravityDetector = new AntigravityDetector();
-  detectors = [copilotDetector, antigravityDetector];
+  const claudeDetector = new ClaudeDetector();
+  const cursorDetector = new CursorDetector();
+  const aiderDetector = new AiderDetector();
+  detectors = [copilotDetector, antigravityDetector, claudeDetector, cursorDetector, aiderDetector];
 
   for (const detector of detectors) {
     context.subscriptions.push(detector);
