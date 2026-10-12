@@ -14,7 +14,11 @@ import {
   QrCode,
   Shuffle,
   Volume1,
-  ExternalLink
+  ExternalLink,
+  Save,
+  BookmarkCheck,
+  HelpCircle,
+  Cpu
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -30,6 +34,7 @@ interface AlertItem {
   resolved?: boolean;
 }
 
+const STORAGE_KEY_ROOM = 'heyhuman_saved_room';
 const RANDOM_ADJECTIVES = ['hyper', 'swift', 'zero', 'cyber', 'silent', 'delta', 'vivid', 'quantum'];
 const RANDOM_NOUNS = ['lynx', 'falcon', 'matrix', 'beacon', 'badger', 'panther', 'nexus', 'pulse'];
 
@@ -42,9 +47,14 @@ function generateRandomRoom(): string {
 
 export function App() {
   const searchParams = new URLSearchParams(window.location.search);
-  const initialRoom = searchParams.get('room') || 'my-workspace';
+  const paramRoom = searchParams.get('room');
+  const savedRoom = localStorage.getItem(STORAGE_KEY_ROOM);
+
+  // Default to URL param > Saved Room > 'my-workspace'
+  const initialRoom = paramRoom || savedRoom || 'my-workspace';
 
   const [room, setRoom] = useState<string>(initialRoom);
+  const [savedStatus, setSavedStatus] = useState<boolean>(savedRoom === initialRoom);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [isAudioEnabled, setIsAudioEnabled] = useState<boolean>(false);
   const [soundType, setSoundType] = useState<'siren' | 'alarm' | 'chime' | 'beep'>('siren');
@@ -54,6 +64,7 @@ export function App() {
   const [isTesting, setIsTesting] = useState<boolean>(false);
   const [isFlashing, setIsFlashing] = useState<boolean>(false);
   const [showQR, setShowQR] = useState<boolean>(false);
+  const [showHelp, setShowHelp] = useState<boolean>(false);
   const [activePendingCount, setActivePendingCount] = useState<number>(0);
 
   const lastSeenIdRef = useRef<string | null>(null);
@@ -70,9 +81,20 @@ export function App() {
   const handleRoomChange = (newRoom: string) => {
     const sanitized = newRoom.toLowerCase().replace(/[^a-z0-9_-]/g, '');
     setRoom(sanitized);
+    setSavedStatus(localStorage.getItem(STORAGE_KEY_ROOM) === sanitized);
     const url = new URL(window.location.href);
     url.searchParams.set('room', sanitized);
     window.history.replaceState({}, '', url.toString());
+  };
+
+  const handleSaveRoom = () => {
+    localStorage.setItem(STORAGE_KEY_ROOM, room);
+    setSavedStatus(true);
+    confetti({
+      particleCount: 25,
+      spread: 45,
+      origin: { y: 0.3 }
+    });
   };
 
   const handleRandomRoom = () => {
@@ -159,9 +181,9 @@ export function App() {
 
     const testItem: AlertItem = {
       id: `test_${Date.now()}`,
-      agent: 'Antigravity / Claude Code',
-      type: 'Permission Request',
-      tool: 'Terminal Command',
+      agent: 'Claude Code',
+      type: 'Terminal Command',
+      tool: 'bash',
       description: 'npm run deploy:production requires user confirmation',
       timestamp: Date.now(),
       resolved: false
@@ -333,6 +355,27 @@ export function App() {
           {/* Quick Header Actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <button
+              onClick={() => setShowHelp(!showHelp)}
+              className="interactive-hover"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.45rem 0.75rem',
+                background: showHelp ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-secondary)',
+                color: showHelp ? '#60a5fa' : 'var(--text-muted)',
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '0.8rem',
+                fontWeight: 600
+              }}
+            >
+              <HelpCircle size={15} />
+              Setup Guide
+            </button>
+
+            <button
               onClick={() => setIsAudioEnabled(!isAudioEnabled)}
               className="interactive-hover"
               style={{
@@ -389,6 +432,59 @@ export function App() {
         flexDirection: 'column',
         gap: '1.5rem'
       }}>
+
+        {/* Step-by-Step Multi-Agent Guide (Expandable Modal / Card) */}
+        {showHelp && (
+          <div className="glass-panel" style={{
+            borderRadius: '14px',
+            padding: '1.5rem',
+            border: '1px solid #3b82f6',
+            background: 'rgba(15, 23, 42, 0.95)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Cpu size={20} color="#60a5fa" />
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff' }}>
+                  How to Connect Any AI Agent (Antigravity, Copilot, Claude, Cursor, Aider)
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowHelp(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-subtle)', cursor: 'pointer', fontSize: '0.85rem' }}
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+              {/* Option A: Extension */}
+              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#10b981', textTransform: 'uppercase' }}>Method 1: VS Code / Antigravity</span>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, margin: '0.3rem 0' }}>HeyHuman Extension</h4>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                  The extension watches <strong>Antigravity</strong>, <strong>GitHub Copilot</strong>, <strong>Cursor</strong>, <strong>Claude</strong>, and <strong>Aider</strong> automatically!
+                </p>
+                <ol style={{ fontSize: '0.78rem', color: 'var(--text-main)', paddingLeft: '1.1rem', lineHeight: '1.5' }}>
+                  <li>Open <code>settings.json</code> in your IDE.</li>
+                  <li>Add your room: <code className="mono" style={{ color: '#06b6d4' }}>"heyhuman.webRoom": "{room}"</code></li>
+                  <li>Whenever ANY agent requests permission, your phone sirens instantly!</li>
+                </ol>
+              </div>
+
+              {/* Option B: Terminal CLI Agents */}
+              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase' }}>Method 2: Standalone CLI / Terminal</span>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, margin: '0.3rem 0' }}>Claude Code & Aider CLI</h4>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                  Using Claude Code CLI or Aider outside of VS Code? Simply send a 1-line curl webhook:
+                </p>
+                <div style={{ background: '#0a0d14', padding: '0.6rem', borderRadius: '6px', fontSize: '0.73rem', color: '#38bdf8', overflowX: 'auto' }}>
+                  <code className="mono">curl -s -X POST "{window.location.origin}/api/alert?room={room}" -d '&#123;"agent":"Claude"&#125;'</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Active Alert Banner (When an AI tool is waiting) */}
         {activePendingCount > 0 && (
@@ -469,14 +565,40 @@ export function App() {
           gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
           gap: '1.5rem'
         }}>
-          {/* Room Configuration */}
+          {/* Room Configuration with Save / Default feature */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
               <label style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 <Radio size={13} color="#06b6d4" />
                 Alert Room Channel
               </label>
-              <span style={{ fontSize: '0.7rem', color: '#06b6d4', fontWeight: 600 }}>Multi-User Isolated</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                {savedStatus ? (
+                  <span style={{ fontSize: '0.7rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.2rem', fontWeight: 600 }}>
+                    <BookmarkCheck size={12} /> Default Room
+                  </span>
+                ) : (
+                  <button
+                    onClick={handleSaveRoom}
+                    className="interactive-hover"
+                    style={{
+                      background: 'rgba(59, 130, 246, 0.15)',
+                      color: '#60a5fa',
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                      borderRadius: '5px',
+                      padding: '0.15rem 0.5rem',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem'
+                    }}
+                  >
+                    <Save size={11} /> Save as Default
+                  </button>
+                )}
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -560,12 +682,22 @@ export function App() {
               </div>
             )}
 
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', marginTop: '0.45rem' }}>
-              Only devices tuned to room <code className="mono" style={{ color: '#06b6d4' }}>{room}</code> receive this broadcast.
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.45rem' }}>
+              <p style={{ fontSize: '0.73rem', color: 'var(--text-subtle)' }}>
+                Tuned to: <code className="mono" style={{ color: '#06b6d4' }}>{room}</code>
+              </p>
+              {!savedStatus && (
+                <button 
+                  onClick={handleSaveRoom}
+                  style={{ background: 'none', border: 'none', color: '#60a5fa', fontSize: '0.73rem', cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  Save as default room
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Sound Profile & Sync */}
+          {/* Sound Profile & Extension Quick Copy */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
               <label style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -616,35 +748,88 @@ export function App() {
               </button>
             </div>
 
-            {/* Extension Sync Hook */}
-            <button
-              onClick={copySettingSnippet}
-              className="interactive-hover"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.4rem 0.75rem',
-                background: 'var(--bg-secondary)',
-                color: 'var(--text-main)',
-                border: '1px solid var(--border)',
-                borderRadius: '7px',
-                fontSize: '0.75rem',
-                cursor: 'pointer'
-              }}
-            >
-              {isSettingCopied ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
-              <span>Copy Extension Setting: <code className="mono" style={{ color: '#06b6d4' }}>"heyhuman.webRoom": "{room}"</code></span>
-            </button>
+            {/* Extension Setting Copy Box with Explanation */}
+            <div style={{ background: 'var(--bg-secondary)', padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8' }}>VS Code / Antigravity Config:</span>
+                <button
+                  onClick={copySettingSnippet}
+                  className="interactive-hover"
+                  style={{
+                    background: 'rgba(59, 130, 246, 0.2)',
+                    color: '#60a5fa',
+                    border: '1px solid rgba(59, 130, 246, 0.35)',
+                    borderRadius: '5px',
+                    padding: '0.15rem 0.45rem',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
+                  }}
+                >
+                  {isSettingCopied ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
+                  {isSettingCopied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <code className="mono" style={{ fontSize: '0.75rem', color: '#06b6d4', display: 'block' }}>
+                "heyhuman.webRoom": "{room}"
+              </code>
+              <p style={{ fontSize: '0.68rem', color: 'var(--text-subtle)', marginTop: '0.25rem' }}>
+                Paste into your editor's <code>settings.json</code> to stream all AI approvals to this tab.
+              </p>
+            </div>
           </div>
         </section>
+
+        {/* Multi-Agent Support Badges */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+          padding: '0.75rem 1rem',
+          borderRadius: '10px',
+          background: 'rgba(18, 24, 36, 0.5)',
+          border: '1px solid var(--border)'
+        }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', fontWeight: 600 }}>
+            Watched AI Agents & Tools:
+          </span>
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+            {[
+              { name: 'Google Antigravity', color: '#38bdf8' },
+              { name: 'GitHub Copilot', color: '#a78bfa' },
+              { name: 'Claude Code', color: '#fb923c' },
+              { name: 'Cursor Agent', color: '#34d399' },
+              { name: 'Aider AI', color: '#f472b6' }
+            ].map(agent => (
+              <span 
+                key={agent.name}
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  color: agent.color,
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)',
+                  padding: '0.15rem 0.5rem',
+                  borderRadius: '999px'
+                }}
+              >
+                ● {agent.name}
+              </span>
+            ))}
+          </div>
+        </div>
 
         {/* Incoming Alerts Feed */}
         <section>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
             <h2 style={{ fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Bot size={17} color="#06b6d4" />
-              Live Permission Feed
+              Live Permission Feed (Room: {room})
             </h2>
             {alerts.length > 0 && (
               <button
@@ -678,7 +863,7 @@ export function App() {
                 Listening on room <span className="mono" style={{ color: '#06b6d4' }}>{room}</span>
               </p>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-subtle)', marginTop: '0.3rem', maxWidth: '420px', margin: '0.3rem auto 0 auto' }}>
-                Keep this tab open on your phone or tablet while away from your desk. You will hear an audible siren the moment your AI pauses for approval.
+                Keep this tab open on your phone or tablet while away from your desk. You will hear an audible siren the moment any AI tool pauses for approval.
               </p>
             </div>
           ) : (
