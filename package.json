@@ -1,0 +1,166 @@
+{
+  "name": "heyhuman",
+  "displayName": "HeyHuman",
+  "description": "Your AI is waiting. Permission required. Audible alerts when AI coding agents need your approval.",
+  "version": "1.0.0",
+  "publisher": "heyhuman",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/heyhuman/heyhuman"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Machine Learning"
+  ],
+  "keywords": [
+    "ai",
+    "copilot",
+    "antigravity",
+    "permission",
+    "alert",
+    "siren",
+    "notification"
+  ],
+  "main": "./out/src/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "heyhuman.toggleAlerts",
+        "title": "HeyHuman: Toggle Alerts"
+      },
+      {
+        "command": "heyhuman.enableAlerts",
+        "title": "HeyHuman: Enable Alerts"
+      },
+      {
+        "command": "heyhuman.disableAlerts",
+        "title": "HeyHuman: Disable Alerts"
+      },
+      {
+        "command": "heyhuman.testSound",
+        "title": "HeyHuman: Test Sound"
+      },
+      {
+        "command": "heyhuman.muteTemporarily",
+        "title": "HeyHuman: Mute Temporarily"
+      },
+      {
+        "command": "heyhuman.unmute",
+        "title": "HeyHuman: Unmute"
+      },
+      {
+        "command": "heyhuman.openSettings",
+        "title": "HeyHuman: Open Settings"
+      },
+      {
+        "command": "heyhuman.showStatus",
+        "title": "HeyHuman: Show Detection Status"
+      }
+    ],
+    "configuration": {
+      "title": "HeyHuman",
+      "properties": {
+        "heyhuman.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Master switch to enable or disable HeyHuman alerts."
+        },
+        "heyhuman.agents.copilot.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable alerts for GitHub Copilot permission prompts."
+        },
+        "heyhuman.agents.antigravity.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable alerts for Google Antigravity permission prompts."
+        },
+        "heyhuman.sound.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Play an audible alert when a permission request is detected."
+        },
+        "heyhuman.sound.type": {
+          "type": "string",
+          "enum": ["siren", "alarm", "chime", "beep"],
+          "default": "siren",
+          "description": "Select the alert sound."
+        },
+        "heyhuman.sound.volume": {
+          "type": "number",
+          "default": 80,
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Volume of alert sound (0 to 100)."
+        },
+        "heyhuman.sound.customSoundPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute path to a custom sound file (.wav, .mp3, .aiff)."
+        },
+        "heyhuman.notifications.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Display a notification message when permission is required."
+        },
+        "heyhuman.notifications.focusWindowOnClick": {
+          "type": "boolean",
+          "default": true,
+          "description": "Attempt to bring window to focus when notification is clicked."
+        },
+        "heyhuman.alerts.cooldownSeconds": {
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "maximum": 300,
+          "description": "Minimum seconds between consecutive alerts to prevent alarm spam."
+        },
+        "heyhuman.alerts.temporaryMuteDurationMinutes": {
+          "type": "number",
+          "default": 15,
+          "minimum": 1,
+          "maximum": 240,
+          "description": "Duration in minutes when temporarily muting alerts."
+        },
+        "heyhuman.antigravity.customLogPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path or directory for Antigravity transcripts (leave empty for auto-detection)."
+        },
+        "heyhuman.antigravity.companionPort": {
+          "type": "number",
+          "default": 47291,
+          "description": "Local port for HeyHuman companion IPC bridge (for external Antigravity sessions)."
+        },
+        "heyhuman.copilot.customLogPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path for Copilot chat transcripts or logs (leave empty for auto-detection)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "node ./node_modules/mocha/bin/mocha 'out/test/**/*.test.js'",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.24.0",
+    "mocha": "^10.4.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}
