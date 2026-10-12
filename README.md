@@ -68,16 +68,34 @@ For developers away from their desk, cooking, or on their phone where desktop si
 - **Acoustic Fallback**: Synthesized Web Audio oscillator engine that works offline and across mobile browsers.
 - **Haptic Feedback**: Mobile vibration sequence on incoming alerts.
 
-### 1-Click Deployment to Vercel
-1. Fork or import this repository on [vercel.com](https://vercel.com).
-2. Set the **Root Directory** to `web`.
-3. Click **Deploy**.
+### 📱 How to Use on Your Phone (Install PWA or Browser)
 
-### Connect Your Extension to Your Phone
-In VS Code / Antigravity:
-1. Press `Cmd+Shift+P` &rarr; choose **`HeyHuman: Set Web Room ID`**.
-2. Type or paste your room code (e.g. `akdey`).
-3. Done! All permission alerts from Antigravity, Copilot, Claude, Cursor, and Aider will stream directly to your phone.
+You do **not** need to install any app from the App Store or Play Store:
+
+1. **Open on your phone**:
+   - Open your deployed URL (e.g., `https://your-domain.vercel.app`) or scan the **QR code** on your desktop screen.
+2. **Install as a PWA (Home Screen App)**:
+   - **iPhone (Safari)**: Tap the **Share** button (box with up arrow) &rarr; scroll down &rarr; tap **"Add to Home Screen"**.
+   - **Android (Chrome)**: Tap the **Three Dots (⋮)** &rarr; tap **"Install App"** (or "Add to Home screen").
+   - It now behaves like a native app on your phone with the HeyHuman robot icon!
+3. **Enable sound on your phone**:
+   - Tap **"Tap for Sound"** / **"Sound On"** once so the browser allows background audio sirens and speech synthesis.
+
+---
+
+### 🔗 How to Connect Your Extension to Your Phone (30-Second Setup)
+
+Once your web app is open on your phone:
+
+1. **Copy your Room ID**:
+   - In the web app, notice your room name (e.g., `akdey`) or tap the **🔄 Rotate** button to generate a fresh one, then tap **Copy**.
+2. **Set the key in your IDE**:
+   - In **VS Code** or **Google Antigravity**, press **`Cmd+Shift+P`** (or `Ctrl+Shift+P` on Windows/Linux).
+   - Search for: **`HeyHuman: Set Web Room ID`**.
+   - Paste your Room ID (e.g. `akdey`) and hit **Enter**.
+   - *(Alternative)*: Click the HeyHuman status bar item at the bottom right &rarr; select **`📡 Pair Web Alert Room...`**.
+3. **Walk away from your desk**:
+   - Whenever Antigravity, GitHub Copilot, Claude Code, Cursor, or Aider asks for permission, your phone will loudly siren and vibrate!
 
 ---
 

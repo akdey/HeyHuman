@@ -1,239 +1,120 @@
-<div align="center">
+# HeyHuman 🚨🤖
 
-<img src="./media/logo.png" alt="HeyHuman Logo" width="160" />
-
-<h1>HeyHuman</h1>
-
-<h3>Your AI is waiting. Permission required.</h3>
-
-<p>
-  A lightweight, reliable VS Code extension that sounds an audible alert whenever an AI coding agent requires your permission, approval, or input to continue working.
+<p align="center">
+  <img src="web/public/logo.svg" alt="HeyHuman Logo" width="120" height="120" />
 </p>
 
-[![VS Code Extension](https://img.shields.io/badge/VS%20Code-v1.85+-blue.svg?logo=visualstudiocode)](https://marketplace.visualstudio.com/)
-[![TypeScript](https://img.shields.io/badge/Language-TypeScript%205.4-blue.svg?logo=typescript)](https://www.typescriptlang.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests Passing](https://img.shields.io/badge/Tests-30%2F30%20Passing-brightgreen.svg)]()
+<p align="center">
+  <strong>"Hey human, wake up! Your AI agent is waiting for your permission."</strong><br>
+  Audible siren, voice speech, and phone alerts when autonomous AI agents (Google Antigravity, GitHub Copilot, Claude Code, Cursor, Aider) need your permission.
+</p>
 
-</div>
-
----
-
-## 💡 The Problem
-
-Autonomous AI coding agents (such as GitHub Copilot in Agent Mode and Google Antigravity) are great at executing multi-step development tasks. But when an agent needs permission to run a terminal command, execute a restricted tool, or asks a clarifying question, **it stops and waits for you**.
-
-If you've switched to another monitor, opened your browser, or stepped away to make coffee, the AI sits idle — and your time is wasted.
-
-## ⚡ The Solution
-
-**HeyHuman** keeps watch in the background. The instant an AI agent reaches a permission prompt, HeyHuman sounds a clear, audible siren (and optional desktop notification) so you can return, approve the step, and keep the agent flowing.
-
-- 🔊 **Audible in Background**: Plays directly through native OS audio drivers (`afplay` on macOS, PowerShell `SoundPlayer` on Windows, `aplay`/`paplay` on Linux) so you never miss a prompt when VS Code is minimized.
-- 🛡️ **Notification-Only**: HeyHuman **never** approves, denies, or runs commands automatically. You retain full control over your security boundary.
-- 🔁 **Lifecycle Deduplication**: Plays exactly once per new permission request. It never rings incessantly in an annoying loop while a prompt is pending.
-- 🔒 **100% Local & Private**: Zero telemetry, zero external network traffic. All inspection happens locally on your machine.
+<p align="center">
+  <a href="https://marketplace.visualstudio.com/items?itemName=akdey.heyhuman"><img src="https://img.shields.io/badge/VS_Code_Marketplace-akdey.heyhuman-blue?logo=visualstudiocode" alt="VS Code Marketplace"></a>
+  <a href="https://open-vsx.org/extension/akdey/heyhuman"><img src="https://img.shields.io/badge/Open_VSX-akdey.heyhuman-purple?logo=eclipse" alt="Open VSX"></a>
+  <a href="https://github.com/akdey/HeyHuman/releases/tag/v1.2.0"><img src="https://img.shields.io/badge/Release-v1.2.0-green" alt="Release"></a>
+  <img src="https://img.shields.io/badge/PWA-Ready-orange" alt="PWA Ready">
+</p>
 
 ---
 
-## 🏗️ Architecture
+## ⚡ Features Matrix
 
-```mermaid
-flowchart TD
-    subgraph Agents ["Target AI Agents"]
-        Copilot["GitHub Copilot<br/>(Chat / Agent Mode)"]
-        Antigravity["Google Antigravity<br/>(IDE / 2.0 Desktop)"]
-        Claude["Claude Code<br/>(Anthropic CLI)"]
-        Cursor["Cursor Agent<br/>(IDE / Composer)"]
-        Aider["Aider<br/>(Terminal / Chat History)"]
-    end
+| Feature | Description | Status |
+| :--- | :--- | :---: |
+| 🚨 **Loud Audio Sirens** | Emergency police siren, alarm, chime, and beep audio profiles | ✅ Done |
+| 🤖 **Multi-Agent Watchers** | Supports Google Antigravity, GitHub Copilot, Claude Code, Cursor, and Aider | ✅ Done |
+| 🪟 **Contextual Window Focus** | Automatically focuses editor, terminal panel, or chat on approval prompts | ✅ Done |
+| 🌐 **PWA & Mobile Relay App** | Web app for phones/tablets away from desk; zero local installation needed | ✅ Done |
+| 📱 **QR Code Mobile Pairing** | Instant phone camera scan to tune phone to your desktop's alert room | ✅ Done |
+| 🔄 **Rotate Key & Auto-Tune** | Instantly generate/cycle secure room keys with automatic persistent tuning | ✅ Done |
+| 🗣️ **Voice Speech Alerts** | Text-to-speech announcement: *"Hey human! AI needs your permission!"* | ✅ Done |
+| 🔒 **Multi-User Room Isolation** | Unique isolated rooms (`?room=akdey`) so alerts never leak to others | ✅ Done |
+| 🪝 **Direct Webhook API** | Simple HTTP POST integration for custom CLI tools and pipelines | ✅ Done |
 
-    subgraph Detectors ["HeyHuman Detection Adapters"]
-        CD["CopilotDetector<br/>(Workspace & Log Monitor)"]
-        AGD["AntigravityDetector<br/>(JSONL Transcript + Port 47291)"]
-        CLD["ClaudeDetector<br/>(CLI Sessions & Terminal Logs)"]
-        CURD["CursorDetector<br/>(Cursor Workspace Storage)"]
-        AIDD["AiderDetector<br/>(.aider.chat.history.md Monitor)"]
-    end
+---
 
-    subgraph Core ["HeyHuman Core Engine"]
-        PT["PermissionTracker<br/>(Deduplication & Lifecycle State)"]
-        AM["AlertManager<br/>(Cooldown, Mute, Agent Toggles)"]
-    end
+## 📁 Repository Structure
 
-    subgraph Alerts ["Alert Dispatchers"]
-        AP["AudioPlayer<br/>(afplay / PowerShell / aplay)"]
-        NM["NotificationManager<br/>(Actionable Desktop Toast)"]
-        SB["StatusBarController<br/>(Real-Time Status & Mute Timer)"]
-    end
-
-    Copilot --> CD
-    Antigravity --> AGD
-    Claude --> CLD
-    Cursor --> CURD
-    Aider --> AIDD
-    CD -->|PermissionEvent| PT
-    AGD -->|PermissionEvent| PT
-    CLD -->|PermissionEvent| PT
-    CURD -->|PermissionEvent| PT
-    AIDD -->|PermissionEvent| PT
-    PT -->|isNewAlert: true| AM
-    AM --> AP
-    AM --> NM
-    AM --> SB
+```
+HeyHuman/
+├── extension/          # VS Code & Antigravity IDE Extension
+│   ├── src/            # Multi-agent watchers, notification & sound engine
+│   ├── media/          # Audio sirens, vector logos, and visual assets
+│   ├── test/           # Test suite (30 passing unit tests)
+│   └── package.json    # Published to VS Code Marketplace & Open VSX
+│
+└── web/                # Mobile-Responsive PWA & Web Siren (Vercel)
+    ├── src/            # React + Vite + Web Audio & Speech Synthesis
+    ├── api/            # Serverless Webhook & Polling Endpoint (/api/alert)
+    ├── public/         # PWA Manifest, Service Worker assets, sound fallbacks
+    └── vercel.json     # 1-Click Vercel deployment configuration
 ```
 
 ---
 
-## 🤖 Supported Agents
+## 🌐 HeyHuman Web App (Deploy on Vercel)
 
-| Agent | Surface | Detection Strategy | Detected Permission Types |
-| :--- | :--- | :--- | :--- |
-| **GitHub Copilot** | VS Code / Copilot Agent Mode | Log & Workspace Storage Observation (`workspaceStorage/<id>/GitHub.copilot-chat/`, `~/.copilot/logs`) | • Terminal execution approval prompts<br>• Custom tool confirmations (`prepareInvocation`)<br>• Script sandbox approval dialogs |
-| **Google Antigravity** | Antigravity IDE & Antigravity 2.0 Desktop | Real-time JSONL Transcript Monitor (`~/.gemini/antigravity/brain/.../transcript.jsonl`) + Companion Port (`47291`) | • Sandbox bypass approvals (`BypassSandbox: true`)<br>• Clarification questionnaires (`ask_question`)<br>• Steps blocked on user input (`WAITING_FOR_INPUT`) |
-| **Claude Code** | Anthropic `claude` CLI / Terminal Sessions | CLI Session & Project Logs Monitor (`~/.claude/sessions/`, `~/.claude/logs/`) | • Bash command confirmation prompts (`[Y/n]`)<br>• Tool execution approval requests<br>• File change confirmations |
-| **Cursor Agent** | Cursor IDE & Composer | Cursor Workspace Storage Observation (`~/Library/Application Support/Cursor/...`) | • Terminal command approval gates<br>• Composer action confirmations<br>• File modification permissions |
-| **Aider** | Aider Terminal & Workspace | Live Chat History Monitor (`.aider.chat.history.md`) | • Shell command execution approvals (`(Y)es/(N)o`)<br>• Code modification approvals |
+For developers away from their desk, cooking, or on their phone where desktop sirens can't be heard:
 
----
+<p align="center">
+  <img src="web/public/logo.svg" width="60" alt="Relay">
+</p>
 
-## 🔊 Bundled Sound Profiles
+### Key Highlights
+- **PWA Installable**: Add to Home Screen on iOS Safari and Android Chrome.
+- **QR Code Pairing**: Instant scan with your phone camera, with robot logo centered in the QR code.
+- **Rotate Key Support**: 1-click button to cycle new secure room IDs (`hyper-orbit-318`).
+- **Acoustic Fallback**: Synthesized Web Audio oscillator engine that works offline and across mobile browsers.
+- **Haptic Feedback**: Mobile vibration sequence on incoming alerts.
 
-HeyHuman includes 4 synthesized, license-free WAV audio assets:
+### 📱 How to Use on Your Phone (Install PWA or Browser)
 
-- **`siren`** *(Default)*: A noticeable 2-second dual-tone oscillating emergency alert (880Hz – 1320Hz warble).
-- **`alarm`**: Rapid 3-burst pulsed urgency tone (960Hz).
-- **`chime`**: Harmonic ascending 3-note notification chime (C5 → E5 → G5).
-- **`beep`**: Modern crisp double UI beep (1200Hz).
-- **Custom Sound**: Point `heyhuman.sound.customSoundPath` to any local `.wav`, `.mp3`, or `.aiff` file.
+You do **not** need to install any app from the App Store or Play Store:
 
----
-
-## ⚙️ Configuration Reference
-
-Configure these settings via VS Code Settings (`Cmd+,` / `Ctrl+,`) or in your `settings.json`:
-
-```jsonc
-{
-  // Master toggle for all HeyHuman alerts
-  "heyhuman.enabled": true,
-
-  // Agent-specific controls
-  "heyhuman.agents.copilot.enabled": true,
-  "heyhuman.agents.antigravity.enabled": true,
-
-  // Audio settings
-  "heyhuman.sound.enabled": true,
-  "heyhuman.sound.type": "siren", // "siren" | "alarm" | "chime" | "beep"
-  "heyhuman.sound.volume": 80,    // 0 to 100
-  "heyhuman.sound.customSoundPath": "",
-
-  // Desktop notifications
-  "heyhuman.notifications.enabled": true,
-  "heyhuman.notifications.focusWindowOnClick": true,
-
-  // Alert rate limiting & mute
-  "heyhuman.alerts.cooldownSeconds": 5,
-  "heyhuman.alerts.temporaryMuteDurationMinutes": 15,
-
-  // Advanced paths & companion port
-  "heyhuman.antigravity.companionPort": 47291,
-  "heyhuman.antigravity.customLogPath": "",
-  "heyhuman.copilot.customLogPath": ""
-}
-```
+1. **Open on your phone**:
+   - Open your deployed URL (e.g., `https://your-domain.vercel.app`) or scan the **QR code** on your desktop screen.
+2. **Install as a PWA (Home Screen App)**:
+   - **iPhone (Safari)**: Tap the **Share** button (box with up arrow) &rarr; scroll down &rarr; tap **"Add to Home Screen"**.
+   - **Android (Chrome)**: Tap the **Three Dots (⋮)** &rarr; tap **"Install App"** (or "Add to Home screen").
+   - It now behaves like a native app on your phone with the HeyHuman robot icon!
+3. **Enable sound on your phone**:
+   - Tap **"Tap for Sound"** / **"Sound On"** once so the browser allows background audio sirens and speech synthesis.
 
 ---
 
-## 🎮 Commands & Status Bar
+### 🔗 How to Connect Your Extension to Your Phone (30-Second Setup)
 
-Open the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
+Once your web app is open on your phone:
 
-- `HeyHuman: Toggle Alerts` — Quick toggle On/Off
-- `HeyHuman: Test Sound` — Play the current sound and volume immediately
-- `HeyHuman: Mute Temporarily` — Mute alerts for 15m, 30m, 1h, or 2h
-- `HeyHuman: Unmute` — Instantly restore alerts
-- `HeyHuman: Show Detection Status` — View active detectors and connection states
-- `HeyHuman: Open Settings` — Open the settings editor
-
-### Status Bar Item
-The status bar displays real-time state:
-- `$(bell) HeyHuman: On` — Active and monitoring
-- `$(bell-slash) HeyHuman: Muted (12m)` — Temporarily muted with live countdown
-- `$(mute) HeyHuman: Off` — Disabled
-
-Click the status bar item at any time to open the **Quick Menu**.
+1. **Copy your Room ID**:
+   - In the web app, notice your room name (e.g., `akdey`) or tap the **🔄 Rotate** button to generate a fresh one, then tap **Copy**.
+2. **Set the key in your IDE**:
+   - In **VS Code** or **Google Antigravity**, press **`Cmd+Shift+P`** (or `Ctrl+Shift+P` on Windows/Linux).
+   - Search for: **`HeyHuman: Set Web Room ID`**.
+   - Paste your Room ID (e.g. `akdey`) and hit **Enter**.
+   - *(Alternative)*: Click the HeyHuman status bar item at the bottom right &rarr; select **`📡 Pair Web Alert Room...`**.
+3. **Walk away from your desk**:
+   - Whenever Antigravity, GitHub Copilot, Claude Code, Cursor, or Aider asks for permission, your phone will loudly siren and vibrate!
 
 ---
 
-## 🚀 Roadmap: What Next?
+## 🧩 Editor Extension (Antigravity, VS Code, Cursor)
 
-Here are the upcoming enhancements planned for the HeyHuman project:
+Install directly from your editor's Extension marketplace:
+- **VS Code**: Search `HeyHuman` or visit [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=akdey.heyhuman).
+- **Antigravity / Cursor / VSCodium**: Search `HeyHuman` on [Open VSX](https://open-vsx.org/extension/akdey/heyhuman).
 
-### 1. Extended Agent Support (✅ Delivered in v1.1.0)
-- [x] **Claude Code (Anthropic CLI)**: Real-time detection for `claude` CLI terminal sessions and approval prompts (`[Y/n]`).
-- [x] **Cursor Agent & Windsurf**: Adapters for Cursor workspace storage and Composer confirmation gates.
-- [x] **Aider**: Live chat history monitor for `.aider.chat.history.md` shell execution and file edit approvals.
-
-### 2. Multi-Device & Mobile Push Notifications (Active Priority)
-- [ ] **Pushover / ntfy.sh Integration**: Send push notifications directly to your phone or Apple Watch when an agent is waiting, so you can step away from your desk entirely.
-- [ ] **Discord / Slack Webhooks**: Notify your private channel or direct message when long-running agent tasks hit a permission gate.
-
-### 3. Voice & Speech Synthesis Alerts
-- [ ] **Spoken Action Prompts**: Instead of just a siren, optionally speak the action: *"Hey Human! Copilot is waiting to run `npm test`"*.
-- [ ] **Custom Voice Clips**: Support recorded voice cues.
-
-### 4. Remote Approval Companion (Optional Webhook Action)
-- [ ] **Mobile Approval Bridge**: A lightweight companion web interface allowing one-click approve/deny directly from your smartphone while away from your desk.
-
-### 5. Operating System Tray Companion
-- [ ] **Standalone System Tray App**: A lightweight background menu bar / tray app (macOS / Windows / Linux) that monitors all coding agents system-wide without requiring VS Code to remain open.
+### Extension CLI commands
+- `HeyHuman: Test Alert Sound`
+- `HeyHuman: Temporarily Mute Alerts (15 mins)`
+- `HeyHuman: Unmute Alerts`
+- `HeyHuman: Toggle Enable/Disable`
 
 ---
 
-## 🛠️ Development & Testing
+## 👨‍💻 Author & Engineering
 
-### Prerequisites
-- Node.js 18+ (tested up to Node.js 24)
-- npm 9+
+Designed & Engineered by **[AMIT KUMAR DEY](https://portfolio.akdey.vercel.app/)**
 
-### Build & Run Tests
-```bash
-# Clone the repository
-git clone https://github.com/heyhuman/heyhuman.git
-cd HeyHuman
-
-# Install dependencies
-npm install
-
-# Compile TypeScript
-npm run compile
-
-# Run the 24 automated unit tests
-npm test
-```
-
-### Package as VSIX
-```bash
-npm run package
-# Generates heyhuman-1.0.0.vsix
-```
-
-### Install in VS Code
-```bash
-code --install-extension heyhuman-1.0.0.vsix
-```
-
----
-
-## 🔒 Security & Privacy
-
-- **Safe By Design**: HeyHuman is strictly a notification utility. It has zero capability to approve or bypass permission prompts on your behalf.
-- **Local Sound Generation**: Built-in sound files are synthesized locally without any network requests.
-- **No Telemetry**: No usage stats, file contents, command strings, or private data are ever transmitted to any remote server.
-
----
-
-## 📄 License
-
-[MIT](LICENSE) © 2026 HeyHuman
+License: MIT
