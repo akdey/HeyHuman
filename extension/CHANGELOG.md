@@ -2,6 +2,15 @@
 
 All notable changes to the "heyhuman" extension will be documented in this file.
 
+## [1.2.1] - 2026-10-13
+
+### Added
+- **Remote Actions Queue**: Dispatches mobile actions (`Approve (y)`, `Reject (n)`, `Bring IDE to Front`) straight to active terminal agent sessions.
+- **Enhanced OS Window Focus**: Multi-target OS-level window activation targeting `Antigravity IDE`, `Antigravity`, `Visual Studio Code`, `Cursor`, and `Code` via AppleScript, PowerShell, and `wmctrl`.
+- **Default Production Relay**: Configured `heyhuman.webEndpoint` default to `https://hey-human-akdey.vercel.app`.
+- **Web Push Notifications**: Cryptographic VAPID Web Push notifications waking phones even when locked in pocket.
+- **Apple-Grade Dialog Redesign**: Polished modal alert UI on mobile with monospace terminal command inspection.
+
 ## [1.2.0] - 2026-10-13
 
 ### Added
