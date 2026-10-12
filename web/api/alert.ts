@@ -1,6 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 
-// In-memory alert store for serverless environment
 export interface AlertItem {
   id: string;
   agent: string;
@@ -12,8 +11,16 @@ export interface AlertItem {
   resolved?: boolean;
 }
 
-// Global cache across warm serverless invocations
+export interface RemoteAction {
+  id: string;
+  action: 'approve' | 'reject' | 'focus';
+  input?: string;
+  timestamp: number;
+}
+
+// Global caches across warm serverless invocations
 const roomAlerts = new Map<string, AlertItem[]>();
+const roomActions = new Map<string, RemoteAction[]>();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Enable CORS
@@ -32,11 +39,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { room = 'default', since } = req.query;
   const roomId = String(room).toLowerCase().trim();
 
-  // POST /api/alert: Trigger an alert or resolve an alert
+  // POST /api/alert: Trigger an alert, submit an action (approve/reject), or clear
   if (req.method === 'POST') {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
     
-    // Check if it's a resolve action from mobile
+    // Remote command approval / action from Phone!
+    if (body.action === 'approve' || body.action === 'reject' || body.action === 'focus') {
+      const actionItem: RemoteAction = {
+        id: body.id || `act_${Date.now()}`,
+        action: body.action,
+        input: body.input || (body.action === 'approve' ? 'y' : 'n'),
+        timestamp: Date.now()
+      };
+
+      const existingActions = roomActions.get(roomId) || [];
+      roomActions.set(roomId, [actionItem, ...existingActions].slice(0, 20));
+
+      // Mark matching alert as resolved
+      const existingAlerts = roomAlerts.get(roomId) || [];
+      const updatedAlerts = existingAlerts.map(a => (!body.id || a.id === body.id) ? { ...a, resolved: true } : a);
+      roomAlerts.set(roomId, updatedAlerts);
+
+      return res.status(200).json({ ok: true, message: `Remote action '${body.action}' queued for desktop` });
+    }
+
     if (body.action === 'resolve') {
       const existing = roomAlerts.get(roomId) || [];
       const updated = existing.map(a => (!body.id || a.id === body.id) ? { ...a, resolved: true } : a);
@@ -46,6 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (body.action === 'clear') {
       roomAlerts.set(roomId, []);
+      roomActions.set(roomId, []);
       return res.status(200).json({ ok: true, message: 'All alerts cleared' });
     }
 
@@ -64,7 +91,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     const existing = roomAlerts.get(roomId) || [];
-    // Keep last 50 alerts
     const trimmed = [newAlert, ...existing].slice(0, 50);
     roomAlerts.set(roomId, trimmed);
 
@@ -75,20 +101,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  // GET /api/alert: Poll for alerts
+  // GET /api/alert: Poll for alerts and pending remote desktop actions
   if (req.method === 'GET') {
     const list = roomAlerts.get(roomId) || [];
-    const sinceTimestamp = since ? Number(since) : 0;
+    const pendingActions = roomActions.get(roomId) || [];
     
-    // Filter alerts newer than `since` if provided
-    const filtered = sinceTimestamp > 0 
+    const sinceTimestamp = since ? Number(since) : 0;
+    const filteredAlerts = sinceTimestamp > 0 
       ? list.filter(a => a.timestamp > sinceTimestamp)
       : list;
+
+    // Filter actions newer than `since`
+    const filteredActions = sinceTimestamp > 0
+      ? pendingActions.filter(act => act.timestamp > sinceTimestamp)
+      : pendingActions;
 
     return res.status(200).json({
       ok: true,
       room: roomId,
-      alerts: filtered,
+      alerts: filteredAlerts,
+      actions: filteredActions,
       serverTime: Date.now()
     });
   }

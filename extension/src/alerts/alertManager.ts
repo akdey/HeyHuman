@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import { PermissionEvent } from '../events/permissionEvent';
 import { SettingsManager } from '../config/settings';
 import { AudioPlayer } from './audioPlayer';
@@ -13,33 +14,31 @@ export class AlertManager {
   private notificationManager: NotificationManager;
   private settings = SettingsManager.getInstance();
   private lastAlertTimestamp = 0;
+  private actionPollerTimer: NodeJS.Timeout | null = null;
+  private lastProcessedActionTime = Date.now();
 
   constructor(options: AlertManagerOptions) {
     this.audioPlayer = options.audioPlayer;
     this.notificationManager = options.notificationManager;
+    this.startRemoteActionPoller();
   }
 
   /**
    * Evaluates alert criteria and triggers sound & notification.
-   * Returns true if alert was actively triggered, false if suppressed.
    */
   public async triggerAlert(event: PermissionEvent): Promise<boolean> {
-    // 1. Check global enablement
     if (!this.settings.isEnabled()) {
       return false;
     }
 
-    // 2. Check per-agent enablement
     if (!this.settings.isAgentEnabled(event.agent)) {
       return false;
     }
 
-    // 3. Check temporary mute
     if (this.settings.isMuted()) {
       return false;
     }
 
-    // 4. Check cooldown
     const now = Date.now();
     const cooldownMs = this.settings.getCooldownSeconds() * 1000;
     if (now - this.lastAlertTimestamp < cooldownMs) {
@@ -53,7 +52,6 @@ export class AlertManager {
       const soundType = this.settings.getSoundType();
       const volume = this.settings.getSoundVolume();
       const customPath = this.settings.getCustomSoundPath();
-      // Non-blocking fire-and-forget to avoid blocking notification
       this.audioPlayer.playSound(soundType, volume, customPath).catch((err) => {
         console.warn('[HeyHuman] Audio playback error:', err);
       });
@@ -107,6 +105,65 @@ export class AlertManager {
   }
 
   /**
+   * Polls for remote actions sent from mobile (Approve, Reject, Focus)
+   */
+  private startRemoteActionPoller(): void {
+    this.actionPollerTimer = setInterval(async () => {
+      const room = this.settings.getWebRoom();
+      if (!room) return;
+
+      try {
+        const endpoint = this.settings.getWebEndpoint();
+        const url = `${endpoint.replace(/\/+$/, '')}/api/alert?room=${encodeURIComponent(room)}&since=${this.lastProcessedActionTime}`;
+        const res = await fetch(url);
+        if (!res.ok) return;
+
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.actions) && data.actions.length > 0) {
+          for (const act of data.actions) {
+            if (act.timestamp > this.lastProcessedActionTime) {
+              this.lastProcessedActionTime = act.timestamp;
+              await this.handleRemoteAction(act);
+            }
+          }
+        }
+      } catch {
+        // Silently retry next poll
+      }
+    }, 1500);
+  }
+
+  /**
+   * Executes remote approval or focus action on the desktop
+   */
+  private async handleRemoteAction(action: { action: string; input?: string }): Promise<void> {
+    console.log(`[HeyHuman] Executing remote action from phone: ${action.action}`);
+
+    if (action.action === 'approve') {
+      // 1. Bring window to front
+      this.notificationManager.bringWindowToFront();
+
+      // 2. Send approval input to active terminal (Claude Code / Aider / CLI)
+      const input = action.input || 'y';
+      if (vscode.window.activeTerminal) {
+        vscode.window.activeTerminal.sendText(input);
+      } else if (vscode.window.terminals.length > 0) {
+        vscode.window.terminals[0].sendText(input);
+      }
+
+      vscode.window.showInformationMessage(`📱 HeyHuman: Remote Approval applied ('${input}') from mobile.`);
+    } else if (action.action === 'reject') {
+      this.notificationManager.bringWindowToFront();
+      if (vscode.window.activeTerminal) {
+        vscode.window.activeTerminal.sendText('n');
+      }
+      vscode.window.showInformationMessage('📱 HeyHuman: Action rejected from mobile.');
+    } else if (action.action === 'focus') {
+      await this.notificationManager.focusAgentContext();
+    }
+  }
+
+  /**
    * Tests the sound configured by the user.
    */
   public async testSound(): Promise<boolean> {
@@ -117,6 +174,10 @@ export class AlertManager {
   }
 
   public dispose(): void {
+    if (this.actionPollerTimer) {
+      clearInterval(this.actionPollerTimer);
+      this.actionPollerTimer = null;
+    }
     this.audioPlayer.dispose();
   }
 }

@@ -34,10 +34,8 @@ export class NotificationManager {
 
     const shortSummary = event.summary ? `: ${event.summary}` : '';
     const message = `🚨 HeyHuman! ${agentTitle} needs your permission${shortSummary}`;
-
     const muteOption = `Mute (${this.settings.getTemporaryMuteDurationMinutes()}m)`;
     
-    // Determine the most relevant action button
     const focusOption = event.type === 'terminal_command' 
       ? 'Review in Terminal' 
       : 'Review in Chat';
@@ -73,25 +71,22 @@ export class NotificationManager {
   /**
    * Brings the application window to the foreground and focuses the relevant context.
    */
-  public async focusAgentContext(event: PermissionEvent): Promise<void> {
-    // 1. Bring window to the foreground at the OS level
+  public async focusAgentContext(event?: PermissionEvent): Promise<void> {
+    // 1. Force window to foreground at OS level
     this.bringWindowToFront();
 
-    // 2. Focus the relevant interactive panel within VS Code
+    // 2. Focus internal editor panels
     try {
-      if (event.type === 'terminal_command') {
-        // Focus integrated terminal where command is waiting
+      if (event && event.type === 'terminal_command') {
         await vscode.commands.executeCommand('workbench.action.terminal.focus');
       } else {
-        // Focus chat panel or auxiliary sidebar where tool/permission prompt is waiting
         try {
           await vscode.commands.executeCommand('workbench.action.chat.open');
         } catch {
-          await vscode.commands.executeCommand('workbench.action.focusSideBar');
+          await vscode.commands.executeCommand('workbench.action.terminal.focus');
         }
       }
     } catch {
-      // Fallback: focus editor group
       try {
         await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
       } catch {
@@ -101,19 +96,41 @@ export class NotificationManager {
   }
 
   /**
-   * OS-level window activation.
+   * Multi-strategy OS-level window activation.
+   * Ensures Antigravity IDE, Visual Studio Code, Cursor, or whichever host is running comes to the front.
    */
-  private bringWindowToFront(): void {
+  public bringWindowToFront(): void {
     try {
-      const appName = vscode.env.appName || 'Visual Studio Code';
       if (process.platform === 'darwin') {
-        exec(`open -a "${appName}"`, (err) => {
+        // Multi-fallback AppleScript targeting active editor hosts
+        const appleScript = `
+          tell application "System Events"
+            set appNames to {"Antigravity IDE", "Antigravity", "Visual Studio Code", "Cursor", "Code"}
+            repeat with appName in appNames
+              if exists (process appName) then
+                tell process appName to set frontmost to true
+                exit repeat
+              end if
+            end repeat
+          end tell
+        `;
+        exec(`osascript -e '${appleScript.replace(/\n/g, ' ')}'`, (err) => {
           if (err) {
-            exec(`osascript -e 'tell application "${appName}" to activate'`, () => {});
+            // Direct launch fallback
+            exec('open -a "Antigravity IDE" 2>/dev/null || open -a "Visual Studio Code" 2>/dev/null || open -a "Cursor" 2>/dev/null', () => {});
           }
         });
       } else if (process.platform === 'win32') {
-        exec(`powershell -Command "(New-Object -ComObject WScript.Shell).AppActivate('${appName}')"`, () => {});
+        const psScript = `
+          $targets = @('Antigravity', 'Code', 'Cursor')
+          $wshell = New-Object -ComObject WScript.Shell
+          foreach ($t in $targets) {
+            if ($wshell.AppActivate($t)) { break }
+          }
+        `;
+        exec(`powershell -NoProfile -Command "${psScript.replace(/\n/g, ' ')}"`, () => {});
+      } else if (process.platform === 'linux') {
+        exec('wmctrl -x -a code.Code 2>/dev/null || wmctrl -x -a antigravity 2>/dev/null || xdotool search --onlyvisible --class code windowactivate 2>/dev/null', () => {});
       }
     } catch (err) {
       console.warn('[HeyHuman] OS focus activation error:', err);

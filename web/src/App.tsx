@@ -166,6 +166,25 @@ export function App() {
     });
   };
 
+  const handleRemoteAction = (id: string, action: 'approve' | 'reject' | 'focus') => {
+    if (action === 'approve') {
+      confetti({
+        particleCount: 50,
+        spread: 70,
+        origin: { y: 0.65 },
+        colors: ['#34c759', '#0071e3', '#ffffff']
+      });
+    }
+
+    setAlerts(prev => prev.map(a => a.id === id ? { ...a, resolved: true } : a));
+
+    fetch(`/api/alert?room=${encodeURIComponent(room)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action })
+    }).catch(() => {});
+  };
+
   const handleResolve = (id: string) => {
     confetti({
       particleCount: 40,
@@ -341,26 +360,84 @@ export function App() {
               )}
             </div>
 
-            <button
-              onClick={() => handleResolve(pendingAlert.id)}
-              style={{
-                background: 'var(--accent-green)',
-                color: '#000000',
-                border: 'none',
-                borderRadius: '14px',
-                padding: '0.85rem 2rem',
-                fontSize: '0.95rem',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                cursor: 'pointer',
-                boxShadow: '0 4px 18px rgba(52, 199, 89, 0.4)'
-              }}
-            >
-              <CheckCircle2 size={18} />
-              Silence & Done
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', width: '100%', maxWidth: '340px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', width: '100%' }}>
+                <button
+                  onClick={() => handleRemoteAction(pendingAlert.id, 'approve')}
+                  style={{
+                    background: 'var(--accent-green)',
+                    color: '#000000',
+                    border: 'none',
+                    borderRadius: '13px',
+                    padding: '0.8rem 1rem',
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.35rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 18px rgba(52, 199, 89, 0.35)'
+                  }}
+                >
+                  <CheckCircle2 size={16} />
+                  Approve (y)
+                </button>
+
+                <button
+                  onClick={() => handleRemoteAction(pendingAlert.id, 'reject')}
+                  style={{
+                    background: 'rgba(255, 59, 48, 0.15)',
+                    color: 'var(--accent-red)',
+                    border: '1px solid rgba(255, 59, 48, 0.35)',
+                    borderRadius: '13px',
+                    padding: '0.8rem 1rem',
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.35rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Reject (n)
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+                <button
+                  onClick={() => handleRemoteAction(pendingAlert.id, 'focus')}
+                  style={{
+                    flex: 1,
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    color: 'var(--text-1)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '11px',
+                    padding: '0.6rem 0.8rem',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  🪟 Bring IDE to Front
+                </button>
+                <button
+                  onClick={() => handleResolve(pendingAlert.id)}
+                  style={{
+                    background: 'none',
+                    color: 'var(--text-3)',
+                    border: 'none',
+                    padding: '0.6rem 0.8rem',
+                    fontSize: '0.78rem',
+                    fontWeight: 500,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Silence Only
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           <div style={{
