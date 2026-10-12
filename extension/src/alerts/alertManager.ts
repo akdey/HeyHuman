@@ -118,8 +118,8 @@ export class AlertManager {
         const res = await fetch(url);
         if (!res.ok) return;
 
-        const data = await res.json();
-        if (data.ok && Array.isArray(data.actions) && data.actions.length > 0) {
+        const data = (await res.json()) as any;
+        if (data && data.ok && Array.isArray(data.actions) && data.actions.length > 0) {
           for (const act of data.actions) {
             if (act.timestamp > this.lastProcessedActionTime) {
               this.lastProcessedActionTime = act.timestamp;

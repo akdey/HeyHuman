@@ -2,6 +2,11 @@
 
 All notable changes to the "heyhuman" extension will be documented in this file.
 
+## [1.2.2] - 2026-10-13
+
+### Changed
+- **Synchronized Documentation**: Synced extension README and CHANGELOG to Marketplace and Open VSX with complete 30-second phone setup guides, Apple-grade alert modal inspection, and lock-screen Web Push notification instructions.
+
 ## [1.2.1] - 2026-10-13
 
 ### Added
