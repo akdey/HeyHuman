@@ -8,6 +8,7 @@ import {
   Copy, 
   Check, 
   QrCode, 
+  RefreshCw,
   X,
   ExternalLink
 } from 'lucide-react';
@@ -26,6 +27,14 @@ interface AlertItem {
 }
 
 const STORAGE_KEY = 'heyhuman_room';
+
+function generateRandomKey(): string {
+  const words = ['alpha', 'bravo', 'echo', 'delta', 'hyper', 'swift', 'zero', 'cyber', 'vivid', 'pulse', 'lynx', 'orbit', 'flux', 'apex'];
+  const w1 = words[Math.floor(Math.random() * words.length)];
+  const w2 = words[Math.floor(Math.random() * words.length)];
+  const num = Math.floor(100 + Math.random() * 900);
+  return `${w1}-${w2}-${num}`;
+}
 
 export function App() {
   const searchParams = new URLSearchParams(window.location.search);
@@ -406,7 +415,7 @@ export function App() {
             </button>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.45rem' }}>
             <input 
               type="text"
               value={room}
@@ -424,6 +433,23 @@ export function App() {
                 outline: 'none'
               }}
             />
+            <button
+              onClick={() => updateRoom(generateRandomKey())}
+              title="Rotate / Generate New Key"
+              style={{
+                background: 'var(--surface-raised)',
+                border: '1px solid var(--border)',
+                borderRadius: '12px',
+                padding: '0 0.8rem',
+                color: 'var(--text-2)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <RefreshCw size={14} />
+            </button>
             <button
               onClick={copyRoom}
               style={{
