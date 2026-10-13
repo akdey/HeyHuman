@@ -84,6 +84,7 @@ export function App() {
 
   const [isPushSubscribed, setIsPushSubscribed] = useState<boolean>(false);
   const [customInputText, setCustomInputText] = useState<string>('');
+  const [selectedOptionIndex, setSelectedOptionIndex] = useState<number>(1);
 
   const lastSeenIdRef = useRef<string | null>(null);
   const pollerRef = useRef<number | null>(null);
@@ -272,10 +273,18 @@ export function App() {
     handleUnlockAudio();
     const testItem: AlertItem = {
       id: `test_${Date.now()}`,
-      agent: 'AI Agent',
-      type: 'Permission Request',
+      agent: 'Google Antigravity',
+      type: 'terminal_command',
       tool: 'Terminal',
-      description: 'Test permission alert is working properly',
+      command: 'npx -y @vscode/vsce package',
+      description: 'Allow re-package extension into VSIX?',
+      options: [
+        'Yes, allow this time',
+        "Yes, and always allow 'npx' in this conversation",
+        "Yes, and always allow 'npx'",
+        'No (tell the agent what to do instead)'
+      ],
+      allowCustomInput: true,
       timestamp: Date.now(),
       resolved: false
     };
@@ -293,16 +302,16 @@ export function App() {
 
   const handleRemoteAction = (
     id: string, 
-    action: 'approve' | 'reject' | 'focus' | 'answer',
+    action: 'approve' | 'reject' | 'focus' | 'answer' | 'submit_permission',
     input?: string,
     selectionIndex?: number
   ) => {
-    if (action === 'approve' || action === 'answer') {
+    if (action === 'approve' || action === 'answer' || action === 'submit_permission') {
       confetti({
         particleCount: 50,
         spread: 70,
         origin: { y: 0.65 },
-        colors: ['#34c759', '#0071e3', '#ffffff']
+        colors: ['#0071e3', '#34c759', '#ffffff']
       });
     }
 
@@ -354,6 +363,61 @@ export function App() {
   };
 
   const pendingAlert = alerts.find(a => !a.resolved);
+
+  useEffect(() => {
+    if (pendingAlert) {
+      setSelectedOptionIndex(1);
+      setCustomInputText('');
+    }
+  }, [pendingAlert?.id]);
+
+  const handleSubmitAntigravity = () => {
+    if (!pendingAlert) return;
+    const optionsList = extractOptions(pendingAlert);
+    const resolvedOptions = optionsList.length > 0 ? optionsList : [
+      'Yes, allow this time',
+      "Yes, and always allow in this conversation",
+      "Yes, and always allow",
+      'No (tell the agent what to do instead)'
+    ];
+
+    const selectedText = resolvedOptions[selectedOptionIndex - 1] || '';
+    const isCustom = selectedOptionIndex === 4 || selectedText.toLowerCase().includes('tell the agent');
+    const finalInput = isCustom && customInputText.trim() ? customInputText.trim() : selectedText;
+
+    handleRemoteAction(
+      pendingAlert.id,
+      'submit_permission',
+      finalInput,
+      selectedOptionIndex
+    );
+  };
+
+  useEffect(() => {
+    if (!pendingAlert) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      if (e.key === '1') {
+        setSelectedOptionIndex(1);
+      } else if (e.key === '2') {
+        setSelectedOptionIndex(2);
+      } else if (e.key === '3') {
+        setSelectedOptionIndex(3);
+      } else if (e.key === '4') {
+        setSelectedOptionIndex(4);
+      } else if (e.key === 'Enter') {
+        handleSubmitAntigravity();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pendingAlert, selectedOptionIndex, customInputText]);
 
   return (
     <div style={{
@@ -447,42 +511,25 @@ export function App() {
         
         {/* BIG HERO: Active Alarm OR Listening Radar */}
         {pendingAlert ? (
-          <div 
-            className="alarm-active"
-            style={{
-              background: 'radial-gradient(120% 120% at 50% 0%, rgba(255, 59, 48, 0.18) 0%, rgba(18, 20, 28, 0.95) 70%)',
-              backdropFilter: 'blur(30px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(30px) saturate(180%)',
-              border: '1px solid rgba(255, 59, 48, 0.5)',
-              borderRadius: '26px',
-              padding: '1.75rem 1.4rem',
-              boxShadow: '0 20px 48px -10px rgba(0, 0, 0, 0.8), 0 0 30px rgba(255, 59, 48, 0.25)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '1.25rem',
-              width: '100%',
-              maxWidth: '460px',
-              margin: '0 auto'
-            }}
-          >
-            {/* Top Badges & Agent Status */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <div style={{ width: '100%', maxWidth: '480px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            
+            {/* Top Status Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 0.25rem' }}>
               <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.45rem',
-                background: 'rgba(255, 59, 48, 0.16)',
-                border: '1px solid rgba(255, 59, 48, 0.3)',
-                padding: '0.35rem 0.8rem',
+                background: 'rgba(255, 59, 48, 0.15)',
+                border: '1px solid rgba(255, 59, 48, 0.35)',
+                padding: '0.3rem 0.75rem',
                 borderRadius: '999px',
                 color: 'var(--accent-red)',
-                fontSize: '0.75rem',
+                fontSize: '0.74rem',
                 fontWeight: 700,
                 letterSpacing: '0.04em',
                 textTransform: 'uppercase'
               }}>
-                <ShieldAlert size={14} />
+                <ShieldAlert size={12} />
                 <span>{pendingAlert.agent}</span>
               </div>
 
@@ -491,236 +538,341 @@ export function App() {
               </span>
             </div>
 
-            {/* Core Header Text */}
-            <div style={{ textAlign: 'center', width: '100%' }}>
-              <h2 style={{
-                fontSize: '1.4rem',
-                fontWeight: 700,
-                letterSpacing: '-0.025em',
-                color: 'var(--text-1)',
-                lineHeight: '1.2'
-              }}>
-                Permission Required
-              </h2>
-              <p style={{
-                fontSize: '0.86rem',
-                color: 'var(--text-2)',
-                marginTop: '0.4rem',
-                lineHeight: '1.4',
-                fontWeight: 400
-              }}>
-                {pendingAlert.description}
-              </p>
-            </div>
+            {/* Agent Specific Card Rendering */}
+            {(() => {
+              const isAntigravity = pendingAlert.agent.toLowerCase().includes('antigravity');
+              const isCopilot = pendingAlert.agent.toLowerCase().includes('copilot');
+              const isClaude = pendingAlert.agent.toLowerCase().includes('claude');
+              const extractedOpts = extractOptions(pendingAlert);
+              const hasOptions = extractedOpts.length > 0;
 
-            {/* Code / Command Inspection Terminal Block (Only for real shell commands) */}
-            {pendingAlert.command && !(pendingAlert.command.trim().startsWith('{') || pendingAlert.command.trim().startsWith('[')) && (
-              <div style={{
-                width: '100%',
-                background: 'rgba(0, 0, 0, 0.55)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '14px',
-                overflow: 'hidden'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                  padding: '0.45rem 0.8rem',
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-                  color: 'var(--text-3)',
-                  fontSize: '0.7rem',
-                  fontWeight: 600
-                }}>
-                  <Terminal size={12} />
-                  <span>Action / Command</span>
-                </div>
-                <div style={{ padding: '0.75rem 0.85rem', textAlign: 'left' }}>
-                  <code style={{
-                    fontSize: '0.8rem',
-                    color: '#38bdf8',
-                    fontFamily: 'var(--font-mono)',
-                    wordBreak: 'break-all',
-                    display: 'block',
-                    maxHeight: '120px',
-                    overflowY: 'auto',
-                    lineHeight: '1.45'
-                  }}>
-                    {pendingAlert.command}
-                  </code>
-                </div>
-              </div>
-            )}
+              // CASE 1: Google Antigravity (Exact match to desktop screenshot media_1791905862677.png)
+              if (isAntigravity || hasOptions) {
+                const defaultAgOptions = [
+                  'Yes, allow this time',
+                  "Yes, and always allow in this conversation",
+                  "Yes, and always allow",
+                  'No (tell the agent what to do instead)'
+                ];
+                const resolvedOptions = extractedOpts.length > 0 ? extractedOpts : defaultAgOptions;
 
-            {/* Action Area: Options 1, 2, 3, 4 OR Binary Approve / Reject */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
-              {(() => {
-                const optionsList = extractOptions(pendingAlert);
-
-                if (optionsList.length > 0) {
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', width: '100%' }}>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        Select Option (1, 2, 3...):
-                      </span>
-                      {optionsList.map((opt, idx) => {
-                        const isRecommended = opt.toLowerCase().includes('(recommended)');
-                        return (
-                          <button
-                            key={idx}
-                            onClick={() => handleRemoteAction(pendingAlert.id, 'answer', opt, idx + 1)}
-                            style={{
-                              background: isRecommended ? 'rgba(52, 199, 89, 0.14)' : 'rgba(255, 255, 255, 0.05)',
-                              border: `1px solid ${isRecommended ? 'rgba(52, 199, 89, 0.4)' : 'var(--border)'}`,
-                              borderRadius: '14px',
-                              padding: '0.8rem 1rem',
-                              color: isRecommended ? '#4ade80' : 'var(--text-1)',
-                              fontSize: '0.86rem',
-                              fontWeight: 600,
-                              textAlign: 'left',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.65rem',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease',
-                              boxShadow: isRecommended ? '0 4px 14px rgba(52, 199, 89, 0.15)' : 'none'
-                            }}
-                          >
-                            <span style={{
-                              background: isRecommended ? 'var(--accent-green)' : 'rgba(255, 255, 255, 0.1)',
-                              color: isRecommended ? '#000000' : 'var(--text-2)',
-                              borderRadius: '8px',
-                              width: '24px',
-                              height: '24px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              flexShrink: 0
-                            }}>
-                              {idx + 1}
-                            </span>
-                            <span style={{ flex: 1, lineHeight: '1.3' }}>{opt}</span>
-                          </button>
-                        );
-                      })}
-
-                      {/* Custom write-in text response */}
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        background: 'rgba(0, 0, 0, 0.45)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '14px',
-                        padding: '0.35rem 0.45rem 0.35rem 0.85rem',
-                        marginTop: '0.35rem',
-                        gap: '0.4rem'
-                      }}>
-                        <input
-                          type="text"
-                          value={customInputText}
-                          onChange={e => setCustomInputText(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter' && customInputText.trim()) {
-                              handleRemoteAction(pendingAlert.id, 'answer', customInputText.trim());
-                              setCustomInputText('');
-                            }
-                          }}
-                          placeholder="Or type custom answer / note..."
-                          style={{
-                            flex: 1,
-                            minWidth: 0,
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#ffffff',
-                            fontSize: '0.84rem',
-                            outline: 'none'
-                          }}
-                        />
-                        <button
-                          disabled={!customInputText.trim()}
-                          onClick={() => {
-                            if (customInputText.trim()) {
-                              handleRemoteAction(pendingAlert.id, 'answer', customInputText.trim());
-                              setCustomInputText('');
-                            }
-                          }}
-                          style={{
-                            background: customInputText.trim() ? 'var(--accent-blue)' : 'rgba(255, 255, 255, 0.08)',
-                            color: customInputText.trim() ? '#ffffff' : 'var(--text-3)',
-                            border: 'none',
-                            borderRadius: '10px',
-                            padding: '0.55rem 0.85rem',
-                            fontSize: '0.78rem',
-                            fontWeight: 600,
-                            cursor: customInputText.trim() ? 'pointer' : 'default'
-                          }}
-                        >
-                          Send
-                        </button>
-                      </div>
-                    </div>
-                  );
+                // Title formatting: "Allow <action>?"
+                let displayTitle = pendingAlert.description || 'Allow action?';
+                if (!displayTitle.toLowerCase().startsWith('allow')) {
+                  displayTitle = `Allow ${displayTitle.replace(/\?$/, '')}?`;
                 }
 
-                // Standard Binary Approve / Reject for terminal commands
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', width: '100%' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.55rem', width: '100%' }}>
+                  <div style={{
+                    background: '#1e1e20',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: '16px',
+                    padding: '1.25rem 1.25rem 1rem 1.25rem',
+                    boxShadow: '0 24px 60px -12px rgba(0, 0, 0, 0.85), 0 0 2px rgba(255, 255, 255, 0.15)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.9rem',
+                    textAlign: 'left'
+                  }}>
+                    {/* 1. Header with Terminal Icon */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                      <div style={{
+                        width: '26px',
+                        height: '26px',
+                        borderRadius: '6px',
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#e4e4e7',
+                        flexShrink: 0
+                      }}>
+                        <Terminal size={15} strokeWidth={2.2} />
+                      </div>
+                      <h2 style={{
+                        fontSize: '0.98rem',
+                        fontWeight: 600,
+                        letterSpacing: '-0.015em',
+                        color: '#ffffff',
+                        margin: 0,
+                        lineHeight: '1.3'
+                      }}>
+                        {displayTitle}
+                      </h2>
+                    </div>
+
+                    {/* 2. Inset Monospace Command Box */}
+                    {pendingAlert.command && !(pendingAlert.command.trim().startsWith('{') || pendingAlert.command.trim().startsWith('[')) && (
+                      <div style={{
+                        background: '#121214',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        borderRadius: '8px',
+                        padding: '0.75rem 0.95rem',
+                        overflowX: 'auto'
+                      }}>
+                        <code style={{
+                          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                          fontSize: '0.84rem',
+                          color: '#f4f4f5',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-all',
+                          display: 'block',
+                          lineHeight: '1.45'
+                        }}>
+                          {pendingAlert.command}
+                        </code>
+                      </div>
+                    )}
+
+                    {/* 3. Numbered Option Rows */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.1rem' }}>
+                      {resolvedOptions.map((opt, idx) => {
+                        const optNumber = idx + 1;
+                        const isSelected = selectedOptionIndex === optNumber;
+                        const isCustomRow = optNumber === 4 || opt.toLowerCase().includes('tell the agent') || opt.toLowerCase().includes('other');
+
+                        return (
+                          <div key={idx} style={{ display: 'flex', flexDirection: 'column' }}>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedOptionIndex(optNumber)}
+                              style={{
+                                background: isSelected ? 'rgba(255, 255, 255, 0.11)' : 'transparent',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '0.6rem 0.75rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.75rem',
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                width: '100%',
+                                transition: 'background 0.12s ease'
+                              }}
+                            >
+                              <span style={{
+                                background: isSelected ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.07)',
+                                color: isSelected ? '#ffffff' : '#9ca3af',
+                                borderRadius: '4px',
+                                width: '22px',
+                                height: '22px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                flexShrink: 0
+                              }}>
+                                {optNumber}
+                              </span>
+                              <span style={{
+                                color: isSelected ? '#ffffff' : '#d4d4d8',
+                                fontSize: '0.88rem',
+                                fontWeight: isSelected ? 500 : 400,
+                                lineHeight: '1.35',
+                                flex: 1
+                              }}>
+                                {opt}
+                              </span>
+                            </button>
+
+                            {/* Expandable input when Option 4 / Tell the agent is active */}
+                            {isSelected && isCustomRow && (
+                              <div style={{
+                                marginTop: '0.4rem',
+                                paddingLeft: '2.5rem',
+                                paddingRight: '0.5rem',
+                                marginBottom: '0.25rem'
+                              }}>
+                                <input
+                                  type="text"
+                                  autoFocus
+                                  value={customInputText}
+                                  onChange={e => setCustomInputText(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                      handleSubmitAntigravity();
+                                    }
+                                  }}
+                                  placeholder="Tell the agent what to do instead..."
+                                  style={{
+                                    width: '100%',
+                                    background: '#121214',
+                                    border: '1px solid rgba(255, 255, 255, 0.22)',
+                                    borderRadius: '8px',
+                                    padding: '0.55rem 0.8rem',
+                                    fontSize: '0.84rem',
+                                    color: '#ffffff',
+                                    outline: 'none',
+                                    boxSizing: 'border-box'
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* 4. Footer: Skip and Submit ↵ buttons */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      alignItems: 'center',
+                      gap: '0.65rem',
+                      marginTop: '0.5rem'
+                    }}>
                       <button
-                        onClick={() => handleRemoteAction(pendingAlert.id, 'approve')}
+                        type="button"
+                        onClick={() => handleRemoteAction(pendingAlert.id, 'reject', 'Skip', 4)}
                         style={{
-                          background: '#34c759',
-                          color: '#000000',
+                          background: 'transparent',
                           border: 'none',
-                          borderRadius: '14px',
-                          padding: '0.85rem 1rem',
-                          fontSize: '0.9rem',
-                          fontWeight: 700,
+                          color: '#9ca3af',
+                          fontSize: '0.88rem',
+                          fontWeight: 500,
+                          padding: '0.45rem 0.85rem',
+                          cursor: 'pointer',
+                          borderRadius: '6px'
+                        }}
+                      >
+                        Skip
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleSubmitAntigravity}
+                        style={{
+                          background: '#0071e3',
+                          border: 'none',
+                          borderRadius: '8px',
+                          color: '#ffffff',
+                          fontSize: '0.88rem',
+                          fontWeight: 600,
+                          padding: '0.5rem 1.25rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 12px rgba(0, 113, 227, 0.45)',
+                          transition: 'transform 0.1s ease'
+                        }}
+                      >
+                        <span>Submit</span>
+                        <span style={{ fontSize: '1rem', lineHeight: '1' }}>↵</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              // CASE 2: GitHub Copilot
+              if (isCopilot) {
+                return (
+                  <div style={{
+                    background: '#161b22',
+                    border: '1px solid #30363d',
+                    borderRadius: '16px',
+                    padding: '1.25rem',
+                    boxShadow: '0 20px 48px -10px rgba(0, 0, 0, 0.85)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.9rem',
+                    textAlign: 'left'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                      <div style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '7px',
+                        background: 'rgba(56, 139, 253, 0.15)',
+                        border: '1px solid rgba(56, 139, 253, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#58a6ff'
+                      }}>
+                        <Terminal size={15} />
+                      </div>
+                      <div>
+                        <h2 style={{ fontSize: '0.98rem', fontWeight: 600, color: '#f0f6fc', margin: 0 }}>
+                          GitHub Copilot
+                        </h2>
+                        <span style={{ fontSize: '0.74rem', color: '#8b949e' }}>
+                          Command execution permission requested
+                        </span>
+                      </div>
+                    </div>
+
+                    <p style={{ margin: 0, fontSize: '0.86rem', color: '#c9d1d9', lineHeight: '1.4' }}>
+                      {pendingAlert.description}
+                    </p>
+
+                    {pendingAlert.command && (
+                      <div style={{
+                        background: '#0d1117',
+                        border: '1px solid #21262d',
+                        borderRadius: '8px',
+                        padding: '0.75rem 0.9rem'
+                      }}>
+                        <code style={{
+                          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                          fontSize: '0.84rem',
+                          color: '#79c0ff',
+                          wordBreak: 'break-all',
+                          display: 'block'
+                        }}>
+                          {pendingAlert.command}
+                        </code>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.6rem' }}>
+                      <button
+                        onClick={() => handleRemoteAction(pendingAlert.id, 'approve', 'y')}
+                        style={{
+                          background: '#238636',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.88rem',
+                          fontWeight: 600,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '0.4rem',
-                          cursor: 'pointer',
-                          boxShadow: '0 4px 18px rgba(52, 199, 89, 0.35)',
-                          transition: 'all 0.15s ease'
+                          cursor: 'pointer'
                         }}
                       >
-                        <CheckCircle2 size={17} />
-                        Approve (y)
+                        <CheckCircle2 size={16} />
+                        Allow (Run)
                       </button>
 
                       <button
-                        onClick={() => handleRemoteAction(pendingAlert.id, 'reject')}
+                        onClick={() => handleRemoteAction(pendingAlert.id, 'reject', 'n')}
                         style={{
-                          background: 'rgba(255, 59, 48, 0.12)',
-                          color: 'var(--accent-red)',
-                          border: '1px solid rgba(255, 59, 48, 0.25)',
-                          borderRadius: '14px',
-                          padding: '0.85rem 1rem',
+                          background: '#21262d',
+                          color: '#f85149',
+                          border: '1px solid rgba(248, 81, 73, 0.3)',
+                          borderRadius: '8px',
+                          padding: '0.75rem 1rem',
                           fontSize: '0.88rem',
-                          fontWeight: 700,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.35rem',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
+                          fontWeight: 600,
+                          cursor: 'pointer'
                         }}
                       >
-                        Reject (n)
+                        Cancel
                       </button>
                     </div>
 
-                    {/* Custom write-in text response for command input */}
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      background: 'rgba(0, 0, 0, 0.45)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '14px',
+                      background: '#0d1117',
+                      border: '1px solid #30363d',
+                      borderRadius: '8px',
                       padding: '0.35rem 0.45rem 0.35rem 0.85rem',
                       gap: '0.4rem'
                     }}>
@@ -734,7 +886,7 @@ export function App() {
                             setCustomInputText('');
                           }
                         }}
-                        placeholder="Type response / input..."
+                        placeholder="Reply to Copilot..."
                         style={{
                           flex: 1,
                           minWidth: 0,
@@ -754,11 +906,11 @@ export function App() {
                           }
                         }}
                         style={{
-                          background: customInputText.trim() ? 'var(--accent-blue)' : 'rgba(255, 255, 255, 0.08)',
-                          color: customInputText.trim() ? '#ffffff' : 'var(--text-3)',
+                          background: customInputText.trim() ? '#1f6feb' : 'rgba(255, 255, 255, 0.08)',
+                          color: '#ffffff',
                           border: 'none',
-                          borderRadius: '10px',
-                          padding: '0.55rem 0.85rem',
+                          borderRadius: '6px',
+                          padding: '0.45rem 0.8rem',
                           fontSize: '0.78rem',
                           fontWeight: 600,
                           cursor: customInputText.trim() ? 'pointer' : 'default'
@@ -769,49 +921,286 @@ export function App() {
                     </div>
                   </div>
                 );
-              })()}
+              }
 
-              {/* Auxiliary Controls */}
-              <div style={{ display: 'flex', gap: '0.55rem', width: '100%' }}>
-                <button
-                  onClick={() => handleRemoteAction(pendingAlert.id, 'focus')}
-                  title="Raise desktop editor to foreground"
-                  style={{
-                    flex: 1,
-                    background: 'rgba(255, 255, 255, 0.06)',
-                    color: 'var(--text-1)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '12px',
-                    padding: '0.65rem 0.8rem',
-                    fontSize: '0.78rem',
-                    fontWeight: 600,
+              // CASE 3: Claude Code
+              if (isClaude) {
+                return (
+                  <div style={{
+                    background: '#1c1917',
+                    border: '1px solid rgba(234, 88, 12, 0.3)',
+                    borderRadius: '16px',
+                    padding: '1.25rem',
+                    boxShadow: '0 20px 48px -10px rgba(0, 0, 0, 0.85)',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.35rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <span>🪟 Bring IDE to Front</span>
-                  <ArrowUpRight size={13} style={{ opacity: 0.6 }} />
-                </button>
+                    flexDirection: 'column',
+                    gap: '0.9rem',
+                    textAlign: 'left'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                      <div style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '7px',
+                        background: 'rgba(234, 88, 12, 0.15)',
+                        border: '1px solid rgba(234, 88, 12, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#f97316'
+                      }}>
+                        <Terminal size={15} />
+                      </div>
+                      <div>
+                        <h2 style={{ fontSize: '0.98rem', fontWeight: 600, color: '#f5f5f4', margin: 0 }}>
+                          Claude Code
+                        </h2>
+                        <span style={{ fontSize: '0.74rem', color: '#a8a29e' }}>
+                          Terminal execution requested
+                        </span>
+                      </div>
+                    </div>
 
-                <button
-                  onClick={() => handleResolve(pendingAlert.id)}
-                  style={{
-                    background: 'none',
-                    color: 'var(--text-3)',
-                    border: '1px solid transparent',
-                    borderRadius: '12px',
-                    padding: '0.65rem 0.85rem',
-                    fontSize: '0.78rem',
-                    fontWeight: 500,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Silence Only
-                </button>
-              </div>
+                    <p style={{ margin: 0, fontSize: '0.86rem', color: '#e7e5e4', lineHeight: '1.4' }}>
+                      {pendingAlert.description}
+                    </p>
+
+                    {pendingAlert.command && (
+                      <div style={{
+                        background: '#0c0a09',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '8px',
+                        padding: '0.75rem 0.9rem'
+                      }}>
+                        <code style={{
+                          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                          fontSize: '0.84rem',
+                          color: '#fdba74',
+                          wordBreak: 'break-all',
+                          display: 'block'
+                        }}>
+                          {pendingAlert.command}
+                        </code>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.6rem' }}>
+                      <button
+                        onClick={() => handleRemoteAction(pendingAlert.id, 'approve', 'y')}
+                        style={{
+                          background: '#ea580c',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.88rem',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.4rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <CheckCircle2 size={16} />
+                        Allow (y)
+                      </button>
+
+                      <button
+                        onClick={() => handleRemoteAction(pendingAlert.id, 'reject', 'n')}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.06)',
+                          color: '#f87171',
+                          border: '1px solid rgba(248, 113, 113, 0.3)',
+                          borderRadius: '8px',
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.88rem',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Deny (n)
+                      </button>
+                    </div>
+
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: '#0c0a09',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      borderRadius: '8px',
+                      padding: '0.35rem 0.45rem 0.35rem 0.85rem',
+                      gap: '0.4rem'
+                    }}>
+                      <input
+                        type="text"
+                        value={customInputText}
+                        onChange={e => setCustomInputText(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && customInputText.trim()) {
+                            handleRemoteAction(pendingAlert.id, 'answer', customInputText.trim());
+                            setCustomInputText('');
+                          }
+                        }}
+                        placeholder="Reply to Claude..."
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#ffffff',
+                          fontSize: '0.84rem',
+                          outline: 'none'
+                        }}
+                      />
+                      <button
+                        disabled={!customInputText.trim()}
+                        onClick={() => {
+                          if (customInputText.trim()) {
+                            handleRemoteAction(pendingAlert.id, 'answer', customInputText.trim());
+                            setCustomInputText('');
+                          }
+                        }}
+                        style={{
+                          background: customInputText.trim() ? '#ea580c' : 'rgba(255, 255, 255, 0.08)',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '0.45rem 0.8rem',
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
+                          cursor: customInputText.trim() ? 'pointer' : 'default'
+                        }}
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              // CASE 4: Generic Agent Fallback
+              return (
+                <div style={{
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '16px',
+                  padding: '1.25rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.9rem',
+                  textAlign: 'left'
+                }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#ffffff', margin: 0 }}>
+                      Permission Required
+                    </h2>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-2)', marginTop: '0.25rem' }}>
+                      {pendingAlert.description}
+                    </p>
+                  </div>
+
+                  {pendingAlert.command && (
+                    <div style={{
+                      background: 'rgba(0, 0, 0, 0.5)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '8px',
+                      padding: '0.75rem 0.9rem'
+                    }}>
+                      <code style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '0.82rem',
+                        color: '#38bdf8',
+                        wordBreak: 'break-all',
+                        display: 'block'
+                      }}>
+                        {pendingAlert.command}
+                      </code>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.6rem' }}>
+                    <button
+                      onClick={() => handleRemoteAction(pendingAlert.id, 'approve')}
+                      style={{
+                        background: '#34c759',
+                        color: '#000000',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '0.75rem 1rem',
+                        fontSize: '0.88rem',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.4rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <CheckCircle2 size={16} />
+                      Approve (y)
+                    </button>
+
+                    <button
+                      onClick={() => handleRemoteAction(pendingAlert.id, 'reject')}
+                      style={{
+                        background: 'rgba(255, 59, 48, 0.12)',
+                        color: 'var(--accent-red)',
+                        border: '1px solid rgba(255, 59, 48, 0.25)',
+                        borderRadius: '8px',
+                        padding: '0.75rem 1rem',
+                        fontSize: '0.88rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Reject (n)
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Auxiliary Controls Below Card */}
+            <div style={{ display: 'flex', gap: '0.55rem', width: '100%', padding: '0 0.25rem' }}>
+              <button
+                onClick={() => handleRemoteAction(pendingAlert.id, 'focus')}
+                title="Raise desktop editor to foreground"
+                style={{
+                  flex: 1,
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  color: 'var(--text-1)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '10px',
+                  padding: '0.55rem 0.8rem',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.35rem',
+                  cursor: 'pointer'
+                }}
+              >
+                <span>🪟 Bring IDE to Front</span>
+                <ArrowUpRight size={13} style={{ opacity: 0.6 }} />
+              </button>
+
+              <button
+                onClick={() => handleResolve(pendingAlert.id)}
+                style={{
+                  background: 'none',
+                  color: 'var(--text-3)',
+                  border: '1px solid transparent',
+                  borderRadius: '10px',
+                  padding: '0.55rem 0.85rem',
+                  fontSize: '0.78rem',
+                  fontWeight: 500,
+                  cursor: 'pointer'
+                }}
+              >
+                Silence Only
+              </button>
             </div>
           </div>
         ) : (

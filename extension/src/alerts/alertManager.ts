@@ -142,29 +142,33 @@ export class AlertManager {
   /**
    * Executes remote approval, focus, or question answer action on desktop
    */
-  private async handleRemoteAction(action: { id?: string; action: string; input?: string; timestamp?: number }): Promise<void> {
-    console.log(`[HeyHuman] Executing remote action from phone: ${action.action}`);
+  private async handleRemoteAction(action: { id?: string; action: string; input?: string; selectionIndex?: number; timestamp?: number }): Promise<void> {
+    console.log(`[HeyHuman] Executing remote action from phone: ${action.action} (option: ${action.selectionIndex})`);
 
     // Broadcast remote action to agent detectors (e.g. Antigravity companion bridge)
     this.remoteActionEmitter.fire(action);
 
-    if (action.action === 'answer' || (action.input && action.action !== 'reject')) {
-      const input = action.input || 'y';
-      this.notificationManager.bringWindowToFront();
+    const optionNumber = action.selectionIndex || (action.action === 'approve' ? 1 : action.action === 'reject' ? 4 : 1);
 
-      // Copy answer to clipboard for instant access
-      vscode.env.clipboard.writeText(input);
+    if (action.action === 'submit_permission' || action.action === 'answer' || action.selectionIndex) {
+      const input = action.input || '';
 
-      // Send to active terminal
-      if (vscode.window.activeTerminal) {
-        vscode.window.activeTerminal.sendText(input);
-      } else if (vscode.window.terminals.length > 0) {
-        vscode.window.terminals[0].sendText(input);
+      // 1. Pass selection directly to active application modal dialog (Antigravity IDE / Code)
+      this.notificationManager.passSelectionToActiveApplication(optionNumber, input);
+
+      // 2. Put text in clipboard as safety
+      if (input) {
+        vscode.env.clipboard.writeText(input);
       }
 
-      vscode.window.showInformationMessage(`📱 HeyHuman: Remote Answer applied: '${input}' (copied to clipboard)`);
+      // 3. Send to terminal if active terminal exists
+      if (vscode.window.activeTerminal) {
+        vscode.window.activeTerminal.sendText(input || String(optionNumber));
+      }
+
+      vscode.window.showInformationMessage(`📱 HeyHuman: Option ${optionNumber} applied to agent (${input || 'Accepted'})`);
     } else if (action.action === 'approve') {
-      this.notificationManager.bringWindowToFront();
+      this.notificationManager.passSelectionToActiveApplication(1);
       const input = action.input || 'y';
       if (vscode.window.activeTerminal) {
         vscode.window.activeTerminal.sendText(input);
@@ -173,7 +177,7 @@ export class AlertManager {
       }
       vscode.window.showInformationMessage(`📱 HeyHuman: Remote Approval applied ('${input}') from mobile.`);
     } else if (action.action === 'reject') {
-      this.notificationManager.bringWindowToFront();
+      this.notificationManager.passSelectionToActiveApplication(4, action.input);
       if (vscode.window.activeTerminal) {
         vscode.window.activeTerminal.sendText('n');
       }

@@ -2,6 +2,14 @@
 
 All notable changes to the "heyhuman" extension will be documented in this file.
 
+## [1.2.5] - 2026-10-13
+
+### Added
+- **Faithful Antigravity Permission Card Interface**: Complete pixel-faithful mobile recreation of the native Google Antigravity desktop modal prompt. Displays the terminal header, monospace command inset, numbered options (`1`, `2`, `3`, `4`), selected state highlight, expandable custom instruction field on Option 4, `Skip`, and vivid blue `Submit ↵` button.
+- **Agent-Specific Modal Customization**: Tailored UI cards for each AI agent without over-generalization — dedicated interfaces for Google Antigravity, GitHub Copilot, Claude Code, and Cursor.
+- **Direct Application Key Input Simulation**: When an option is submitted from mobile, native automation activates the editor host process (`Antigravity IDE` / `Code` / `Cursor`), enters the option number, inserts any custom response text, and presses Return/Enter (`Submit ↵`) to confirm automatically on the desktop.
+- **Physical Keyboard Navigation**: Full keyboard parity (`1`, `2`, `3`, `4`, and `Enter`) on the mobile web app for instant option switching and submission.
+
 ## [1.2.4] - 2026-10-13
 
 ### Added

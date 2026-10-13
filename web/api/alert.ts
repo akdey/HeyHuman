@@ -21,7 +21,7 @@ export interface AlertItem {
 
 export interface RemoteAction {
   id: string;
-  action: 'approve' | 'reject' | 'focus' | 'answer';
+  action: 'approve' | 'reject' | 'focus' | 'answer' | 'submit_permission';
   input?: string;
   selectionIndex?: number;
   selectionText?: string;
@@ -123,7 +123,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 3. Remote command approval / action / answer from Phone!
-    if (body.action === 'approve' || body.action === 'reject' || body.action === 'focus' || body.action === 'answer') {
+    if (body.action === 'approve' || body.action === 'reject' || body.action === 'focus' || body.action === 'answer' || body.action === 'submit_permission') {
       const actionItem: RemoteAction = {
         id: body.id || `act_${Date.now()}`,
         action: body.action,

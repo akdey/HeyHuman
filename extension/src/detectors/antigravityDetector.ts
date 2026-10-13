@@ -439,7 +439,24 @@ export class AntigravityDetector implements IAgentDetector {
     );
     if (bypassCall) {
       const cmd = bypassCall.args?.CommandLine || 'terminal command';
-      const cleanCmd = String(cmd).replace(/^"|"$/g, '').slice(0, 80);
+      const cleanCmd = String(cmd).replace(/^"|"$/g, '').trim();
+      const toolSummary = String(bypassCall.args?.toolSummary || bypassCall.args?.toolAction || '').trim();
+
+      // Extract executable binary name (e.g. "npx", "git", "npm", "cargo")
+      const firstToken = cleanCmd.split(/\s+/)[0] || 'command';
+      const binaryName = path.basename(firstToken).replace(/["';&|]/g, '');
+
+      // Antigravity native dialog title & exact 4-tier options
+      const promptTitle = toolSummary 
+        ? `Allow ${toolSummary.toLowerCase()}?`
+        : `Allow run command '${binaryName}'?`;
+
+      const options = [
+        'Yes, allow this time',
+        `Yes, and always allow '${binaryName}' in this conversation`,
+        `Yes, and always allow '${binaryName}'`,
+        'No (tell the agent what to do instead)'
+      ];
 
       const id = `ag-step-${stepIndex}-bypass`;
       this.activePendingIds.add(id);
@@ -449,12 +466,12 @@ export class AntigravityDetector implements IAgentDetector {
         agent: 'antigravity',
         type: 'terminal_command',
         state: 'pending',
-        summary: `Terminal Permission: ${cleanCmd}`,
-        details: String(cmd),
-        options: ['Allow Once', 'Always Allow', 'Deny'],
-        allowCustomInput: false,
+        summary: promptTitle,
+        details: cleanCmd,
+        options,
+        allowCustomInput: true,
         timestamp: Date.now(),
-        metadata: { stepIndex, sourcePath }
+        metadata: { stepIndex, sourcePath, binary: binaryName, toolSummary }
       };
 
       this.permissionDetectedEmitter.fire(event);
@@ -670,10 +687,10 @@ async function main() {
     try {
       const compRes = await httpGetJson(\`http://127.0.0.1:\${COMPANION_PORT}/action?id=\${encodeURIComponent(alertId)}&since=\${startTime}\`);
       if (compRes && compRes.action) {
-        if (compRes.action === 'approve') {
+        if (compRes.action === 'approve' || (compRes.action === 'submit_permission' && compRes.selectionIndex !== 4)) {
           outputDecision('allow', 'Approved remotely via HeyHuman mobile app');
           return;
-        } else if (compRes.action === 'reject') {
+        } else if (compRes.action === 'reject' || (compRes.action === 'submit_permission' && compRes.selectionIndex === 4)) {
           outputDecision('deny', 'Rejected remotely via HeyHuman mobile app');
           return;
         }
@@ -686,11 +703,11 @@ async function main() {
       if (webRes && Array.isArray(webRes.actions)) {
         for (const act of webRes.actions) {
           if (act.timestamp >= startTime) {
-            if (act.action === 'approve') {
+            if (act.action === 'approve' || (act.action === 'submit_permission' && act.selectionIndex !== 4)) {
               outputDecision('allow', 'Approved remotely via HeyHuman mobile app');
               return;
-            } else if (act.action === 'reject') {
-              outputDecision('deny', 'Rejected remotely via HeyHuman mobile app');
+            } else if (act.action === 'reject' || (act.action === 'submit_permission' && act.selectionIndex === 4)) {
+              outputDecision('deny', act.input || 'Rejected remotely via HeyHuman mobile app');
               return;
             }
           }

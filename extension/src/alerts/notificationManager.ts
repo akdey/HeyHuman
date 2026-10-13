@@ -136,4 +136,59 @@ export class NotificationManager {
       console.warn('[HeyHuman] OS focus activation error:', err);
     }
   }
+
+  public passSelectionToActiveApplication(optionNumber: number, customText?: string): void {
+    try {
+      const hostApp = (vscode && vscode.env && vscode.env.appName) ? vscode.env.appName : 'Antigravity IDE';
+
+      if (process.platform === 'darwin') {
+        const hasText = !!(customText && customText.trim());
+        const escapedText = hasText ? customText!.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/'/g, "\\'") : '';
+
+        const script = `
+          tell application "System Events"
+            set appNames to {"${hostApp}", "Antigravity IDE", "Antigravity", "Visual Studio Code", "Cursor", "Code"}
+            repeat with appName in appNames
+              if exists (process appName) then
+                tell application appName to activate
+                delay 0.2
+                tell process appName to set frontmost to true
+                delay 0.1
+                keystroke "${optionNumber}"
+                delay 0.1
+                ${hasText && optionNumber === 4 ? `keystroke "${escapedText}"\ndelay 0.1\n` : ''}
+                key code 36
+                exit repeat
+              end if
+            end repeat
+          end tell
+        `;
+        exec(`osascript -e '${script.replace(/\n/g, ' ')}'`, (err) => {
+          if (err) {
+            console.warn('[HeyHuman] AppleScript selection dispatch error:', err);
+          }
+        });
+      } else if (process.platform === 'win32') {
+        const psScript = `
+          $targets = @('${hostApp}', 'Antigravity', 'Code', 'Cursor')
+          $wshell = New-Object -ComObject WScript.Shell
+          foreach ($t in $targets) {
+            if ($wshell.AppActivate($t)) {
+              Start-Sleep -Milliseconds 150
+              $wshell.SendKeys("${optionNumber}")
+              Start-Sleep -Milliseconds 100
+              ${customText && optionNumber === 4 ? `$wshell.SendKeys("${customText.replace(/"/g, '`"')}")\nStart-Sleep -Milliseconds 100\n` : ''}
+              $wshell.SendKeys("{ENTER}")
+              break
+            }
+          }
+        `;
+        exec(`powershell -NoProfile -Command "${psScript.replace(/\n/g, ' ')}"`, () => {});
+      } else if (process.platform === 'linux') {
+        exec(`xdotool key ${optionNumber} Return 2>/dev/null`, () => {});
+      }
+    } catch (err) {
+      console.warn('[HeyHuman] Selection dispatch error:', err);
+    }
+  }
 }
