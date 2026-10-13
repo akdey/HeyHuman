@@ -55,6 +55,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const aiderDetector = new AiderDetector();
   detectors = [copilotDetector, antigravityDetector, claudeDetector, cursorDetector, aiderDetector];
 
+  // Wire mobile actions directly to Antigravity companion IPC
+  context.subscriptions.push(
+    alertManager.onRemoteAction((action) => {
+      outputChannel.appendLine(`[HeyHuman] 📱 Remote action received from mobile: ${action.action} (ID: ${action.id || 'none'})`);
+      antigravityDetector.recordRemoteAction(action);
+    })
+  );
+
   for (const detector of detectors) {
     context.subscriptions.push(detector);
 

@@ -100,14 +100,20 @@ export function App() {
 
       if (!vapidKey) return;
 
-      // Unsubscribe existing if needed or get active
-      let sub = await reg.pushManager.getSubscription();
-      if (!sub) {
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidKey)
-        });
+      // Unsubscribe existing stale subscription to guarantee fresh key sync
+      try {
+        const existingSub = await reg.pushManager.getSubscription();
+        if (existingSub) {
+          await existingSub.unsubscribe();
+        }
+      } catch {
+        // Ignore unsubscribe error
       }
+
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey)
+      });
 
       // Send subscription to server
       const sendRes = await fetch(`/api/alert?room=${encodeURIComponent(room)}`, {
@@ -119,8 +125,12 @@ export function App() {
         })
       });
 
+      const sendData = await sendRes.json();
       if (sendRes.ok) {
         setIsPushSubscribed(true);
+        if (sendData.welcomeError) {
+          alert(`Push server test warning: ${sendData.welcomeError}`);
+        }
       }
     } catch (e: any) {
       console.warn('Push subscription failed:', e);

@@ -12,15 +12,21 @@ self.addEventListener('push', function (event) {
   const title = data.title || 'HeyHuman 🚨 Permission Required!';
   const options = {
     body: data.body || 'Your AI agent is waiting for your approval.',
-    icon: '/logo.svg',
-    badge: '/logo.svg',
-    tag: data.tag || 'heyhuman-alert',
+    icon: '/logo.png',
+    badge: '/icon.png',
+    tag: data.tag || `heyhuman-${Date.now()}`,
     renotify: true,
     requireInteraction: true,
     vibrate: [400, 200, 400, 200, 600],
     data: {
-      url: data.url || '/'
-    }
+      url: data.url || '/',
+      id: data.tag || '',
+      room: data.room || ''
+    },
+    actions: [
+      { action: 'approve', title: '✅ Approve (y)' },
+      { action: 'reject', title: '❌ Reject (n)' }
+    ]
   };
 
   event.waitUntil(
@@ -30,7 +36,28 @@ self.addEventListener('push', function (event) {
 
 self.addEventListener('notificationclick', function (event) {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || '/';
+  const action = event.action;
+  const notifData = event.notification.data || {};
+  const targetUrl = notifData.url || '/';
+
+  // Handle direct lock screen / notification card action buttons
+  if (action === 'approve' || action === 'reject') {
+    const roomParam = notifData.room || 'default';
+    const actionPayload = {
+      action: action,
+      id: notifData.id,
+      input: action === 'approve' ? 'y' : 'n'
+    };
+
+    event.waitUntil(
+      fetch(`/api/alert?room=${encodeURIComponent(roomParam)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(actionPayload)
+      })
+    );
+    return;
+  }
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clientList) {

@@ -17,6 +17,9 @@ export class AlertManager {
   private actionPollerTimer: NodeJS.Timeout | null = null;
   private lastProcessedActionTime = Date.now();
 
+  private readonly remoteActionEmitter = new vscode.EventEmitter<{ id?: string; action: string; input?: string; timestamp?: number }>();
+  public readonly onRemoteAction = this.remoteActionEmitter.event;
+
   constructor(options: AlertManagerOptions) {
     this.audioPlayer = options.audioPlayer;
     this.notificationManager = options.notificationManager;
@@ -136,8 +139,11 @@ export class AlertManager {
   /**
    * Executes remote approval or focus action on the desktop
    */
-  private async handleRemoteAction(action: { action: string; input?: string }): Promise<void> {
+  private async handleRemoteAction(action: { id?: string; action: string; input?: string; timestamp?: number }): Promise<void> {
     console.log(`[HeyHuman] Executing remote action from phone: ${action.action}`);
+
+    // Broadcast remote action to agent detectors (e.g. Antigravity companion bridge)
+    this.remoteActionEmitter.fire(action);
 
     if (action.action === 'approve') {
       // 1. Bring window to front
@@ -178,6 +184,7 @@ export class AlertManager {
       clearInterval(this.actionPollerTimer);
       this.actionPollerTimer = null;
     }
+    this.remoteActionEmitter.dispose();
     this.audioPlayer.dispose();
   }
 }

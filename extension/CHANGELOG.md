@@ -2,6 +2,14 @@
 
 All notable changes to the "heyhuman" extension will be documented in this file.
 
+## [1.2.3] - 2026-10-13
+
+### Added
+- **Antigravity Mobile Approvals Hook**: Automated lifecycle hook (`.agents/hooks.json` & `.agents/scripts/heyhuman-hook.js`) enabling one-tap approvals from mobile without touching desktop. When approved on phone, Antigravity executes immediately.
+- **Companion IPC Action Bridge**: Added `GET /action` and `POST /action` endpoints on `http://127.0.0.1:47291` to bridge remote phone decisions into Antigravity in < 1ms.
+- **Lock Screen Notification Actions**: Interactive Web Push notification buttons (`✅ Approve (y)` and `❌ Reject (n)`) in service worker, allowing developers to approve or reject actions directly on their phone lock screen without opening the browser.
+- **`HeyHuman: Enable Antigravity Mobile Approvals` Command**: One-click command to install and configure Antigravity lifecycle hooks in any workspace.
+
 ## [1.2.2] - 2026-10-13
 
 ### Changed

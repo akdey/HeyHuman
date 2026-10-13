@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { SettingsManager } from '../config/settings';
 import { AlertManager } from '../alerts/alertManager';
 import { IAgentDetector } from '../detectors/detectorTypes';
+import { AntigravityDetector } from '../detectors/antigravityDetector';
 
 export function registerCommands(
   context: vscode.ExtensionContext,
@@ -130,7 +131,19 @@ export function registerCommands(
     })
   );
 
-  // 9. Status Bar Quick Menu
+  // 10. Enable Antigravity Mobile Approval Hook
+  context.subscriptions.push(
+    vscode.commands.registerCommand('heyhuman.setupAntigravityHook', async () => {
+      const ag = detectors.find(d => d.id === 'antigravity') as AntigravityDetector | undefined;
+      if (ag) {
+        await ag.setupWorkspaceHook();
+      } else {
+        vscode.window.showWarningMessage('HeyHuman: Antigravity detector is not active.');
+      }
+    })
+  );
+
+  // 11. Status Bar Quick Menu
   context.subscriptions.push(
     vscode.commands.registerCommand('heyhuman.showQuickMenu', async () => {
       const isEnabled = settings.isEnabled();
@@ -148,6 +161,10 @@ export function registerCommands(
         {
           label: '$(play) Test Sound',
           description: `Play current sound (${settings.getSoundType()})`
+        },
+        {
+          label: '$(shield) Enable Antigravity Mobile Approvals',
+          description: 'Install workspace hook to approve Antigravity from phone'
         },
         {
           label: '$(info) Detection Status & Diagnostics',
@@ -181,6 +198,8 @@ export function registerCommands(
         await vscode.commands.executeCommand('heyhuman.muteTemporarily');
       } else if (selection.label.includes('Test Sound')) {
         await vscode.commands.executeCommand('heyhuman.testSound');
+      } else if (selection.label.includes('Enable Antigravity Mobile Approvals')) {
+        await vscode.commands.executeCommand('heyhuman.setupAntigravityHook');
       } else if (selection.label.includes('Detection Status')) {
         await vscode.commands.executeCommand('heyhuman.showStatus');
       } else if (selection.label.includes('Pair Web Alert Room')) {

@@ -62,16 +62,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const newSub = body.subscription as webpush.PushSubscription;
       // Deduplicate by endpoint
       const filtered = subs.filter(s => s.endpoint !== newSub.endpoint);
-      roomPushSubscriptions.set(roomId, [...filtered, newSub]);
+      const updatedSubs = [...filtered, newSub];
+      roomPushSubscriptions.set(roomId, updatedSubs);
+
+      // Send immediate welcome test push to verify the subscription works end-to-end
+      let welcomeSuccess = false;
+      let welcomeError: string | null = null;
+      try {
+        const welcomePayload = JSON.stringify({
+          title: 'HeyHuman 🚨 Connected!',
+          body: `Lock screen push notifications active for room: ${roomId}`,
+          tag: `welcome_${Date.now()}`,
+          url: `/?room=${encodeURIComponent(roomId)}`
+        });
+        await webpush.sendNotification(newSub, welcomePayload);
+        welcomeSuccess = true;
+      } catch (err: any) {
+        welcomeError = err?.message || String(err);
+        console.error('[HeyHuman] Push test error:', err);
+      }
 
       return res.status(200).json({
         ok: true,
         message: 'Push subscription registered for room',
-        totalSubs: roomPushSubscriptions.get(roomId)?.length
+        welcomeSuccess,
+        welcomeError,
+        totalSubs: updatedSubs.length
       });
     }
 
-    // 2. Remote command approval / action from Phone!
+    // 2. Direct Push Test Trigger
+    if (body.action === 'test_push') {
+      const subs = roomPushSubscriptions.get(roomId) || [];
+      const testPayload = JSON.stringify({
+        title: 'HeyHuman 🚨 Test Notification',
+        body: 'Your phone is successfully paired and ready for alerts!',
+        tag: `test_${Date.now()}`,
+        url: `/?room=${encodeURIComponent(roomId)}`
+      });
+
+      const results = await Promise.allSettled(
+        subs.map(sub => webpush.sendNotification(sub, testPayload))
+      );
+
+      return res.status(200).json({
+        ok: true,
+        message: `Dispatched test push to ${subs.length} subscriber(s)`,
+        subCount: subs.length,
+        results: results.map(r => r.status)
+      });
+    }
+
+    // 3. Remote command approval / action from Phone!
     if (body.action === 'approve' || body.action === 'reject' || body.action === 'focus') {
       const actionItem: RemoteAction = {
         id: body.id || `act_${Date.now()}`,
@@ -104,7 +146,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, message: 'All alerts cleared' });
     }
 
-    // 3. New Alert incoming from Desktop Extension!
+    // 4. New Alert incoming from Desktop Extension!
     const commandValue = body.command || body.details || body.tool || '';
     const descriptionValue = body.description || body.summary || body.message || 'AI agent is waiting for your permission!';
 
@@ -125,35 +167,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Send Web Push notification to all subscribers in this room (wakes locked phones!)
     const subs = roomPushSubscriptions.get(roomId) || [];
+    let pushSuccessCount = 0;
     if (subs.length > 0) {
       const pushPayload = JSON.stringify({
         title: `🚨 ${newAlert.agent} Needs Approval`,
         body: newAlert.command ? `Command: ${newAlert.command}` : newAlert.description,
         tag: newAlert.id,
+        room: roomId,
         url: `/?room=${encodeURIComponent(roomId)}`
       });
 
-      Promise.allSettled(
+      // MUST await all promises so Vercel does not terminate lambda before network calls complete!
+      const results = await Promise.allSettled(
         subs.map(sub => webpush.sendNotification(sub, pushPayload))
-      ).then(results => {
-        // Clean up expired or invalid subscriptions (status 410 or 404)
-        const validSubs = subs.filter((_, idx) => {
-          const res = results[idx];
-          if (res.status === 'rejected') {
-            const err = res.reason;
-            return err && err.statusCode !== 410 && err.statusCode !== 404;
-          }
+      );
+
+      // Clean up expired or invalid subscriptions (status 410 or 404)
+      const validSubs = subs.filter((_, idx) => {
+        const resItem = results[idx];
+        if (resItem.status === 'fulfilled') {
+          pushSuccessCount++;
           return true;
-        });
-        roomPushSubscriptions.set(roomId, validSubs);
-      }).catch(() => {});
+        }
+        const err = resItem.reason;
+        return err && err.statusCode !== 410 && err.statusCode !== 404;
+      });
+      roomPushSubscriptions.set(roomId, validSubs);
     }
 
     return res.status(201).json({
       ok: true,
       alert: newAlert,
       message: 'Alert broadcasted successfully and sent to push subscribers',
-      pushCount: subs.length
+      pushCount: subs.length,
+      pushSuccessCount
     });
   }
 
@@ -161,6 +208,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     const list = roomAlerts.get(roomId) || [];
     const pendingActions = roomActions.get(roomId) || [];
+    const subs = roomPushSubscriptions.get(roomId) || [];
     
     const sinceTimestamp = since ? Number(since) : 0;
     const filteredAlerts = sinceTimestamp > 0 
@@ -177,6 +225,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       room: roomId,
       alerts: filteredAlerts,
       actions: filteredActions,
+      pushCount: subs.length,
       vapidPublicKey: VAPID_PUBLIC_KEY,
       serverTime: Date.now()
     });

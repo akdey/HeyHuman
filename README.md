@@ -66,24 +66,28 @@ You can connect your phone to your desktop in less than a minute — **zero mobi
 
 When an agent needs your permission:
 - **Desktop**: Sounds a loud emergency siren, presents a desktop notification, and speaks the prompt aloud.
+- **Lock Screen**: Receive a native Web Push notification with instant action buttons:
+  - **`✅ Approve (y)`**: Approve directly from your phone lock screen without opening the browser!
+  - **`❌ Reject (n)`**: Reject directly from your lock screen.
 - **Mobile Screen**: Vibrates and displays the exact command or question in a terminal inspection card, with 4 instant actions:
-  - **`Approve (y)`**: Dispatches `'y'` into the active terminal for CLI agents.
-  - **`Reject (n)`**: Dispatches `'n'` into the active terminal to decline.
+  - **`Approve (y)`**: Approves and auto-executes the command.
+  - **`Reject (n)`**: Rejects and cancels execution.
   - **`🪟 Bring IDE to Front`**: Automatically raises your editor window over all other apps on your Mac/PC so you can view it immediately.
   - **`Silence Only`**: Mutes the alarm sound without altering agent state.
 
 ---
 
-## ⚠️ Known Limitations & Upcoming Features (WIP)
+## 🤖 Remote Approvals & Antigravity Hook
 
-### 🧪 Remote Approvals: Terminal vs. GUI Webview Dialogs
+### 1. Terminal Agents (Claude Code, Aider, CLI)
+Tapping **`Approve (y)`** or **`Reject (n)`** injects `'y'` or `'n'` directly into the active terminal session.
 
-- **Terminal-Based Agents (Claude Code, Aider, CLI)**:
-  - Tapping **`Approve (y)`** or **`Reject (n)`** injects `'y'` or `'n'` directly into the active terminal session.
-- **GUI Dialogs & Agent Chat Modals (Google Antigravity & Copilot)**:
-  - **Security Boundary**: In Google Antigravity and VS Code Copilot, permission modals (like "Run unsandboxed command" or interactive questionnaires `ask_question`) run inside sandboxed Electron webviews and native IDE modal dialogs. VS Code's security architecture strictly prohibits third-party extensions from programmatically clicking native dialog buttons.
-  - **Current Behavior**: When you tap **`Approve`** or **`🪟 Bring IDE to Front`**, HeyHuman uses OS-level window activation (AppleScript on macOS, PowerShell on Windows) to immediately bring your IDE to the foreground on your desktop monitor so you can make your selection.
-  - **What's Coming (WIP)**: We are developing a companion bridge that parses question options directly from agent transcripts and renders interactive radio/checkbox options on your phone for full remote answering.
+### 2. Google Antigravity (Zero-Touch Mobile Approvals)
+To allow Antigravity to auto-execute when approved from your phone:
+1. In your project, run **`Cmd+Shift+P`** &rarr; **`HeyHuman: Enable Antigravity Mobile Approvals`**.
+2. This creates `.agents/hooks.json` in your project root using Antigravity's native `PreToolUse` lifecycle hook.
+3. When Antigravity needs permission (e.g. `BypassSandbox: true`), the hook alerts your phone.
+4. When you tap **`Approve (y)`** on your phone, the hook outputs `{"decision": "allow"}` and Antigravity **executes the command immediately without prompting on your desktop**!
 
 ---
 

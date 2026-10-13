@@ -70,6 +70,7 @@ export class AntigravityDetector implements IAgentDetector {
     this.watchedFiles.clear();
     this.fileOffsets.clear();
     this.activePendingIds.clear();
+    this.recentActions = [];
 
     if (this.companionServer) {
       try {
@@ -93,20 +94,72 @@ export class AntigravityDetector implements IAgentDetector {
   /**
    * Starts a lightweight local HTTP bridge for external Antigravity sessions/scripts.
    */
+  private recentActions: Array<{ id?: string; action: string; timestamp: number }> = [];
+
   private startCompanionServer(): void {
     const port = this.settings.getAntigravityCompanionPort();
     try {
       this.companionServer = http.createServer((req, res) => {
-        const url = req.url || '';
+        const rawUrl = req.url || '';
         const method = req.method || 'GET';
+        const parsedUrl = new URL(rawUrl, 'http://127.0.0.1');
 
-        if (method === 'GET' && (url === '/' || url === '/status')) {
+        if (method === 'GET' && (parsedUrl.pathname === '/' || parsedUrl.pathname === '/status')) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ status: 'ok', service: 'HeyHuman Antigravity Companion' }));
+          res.end(JSON.stringify({
+            status: 'ok',
+            service: 'HeyHuman Antigravity Companion',
+            room: this.settings.getWebRoom(),
+            pendingCount: this.activePendingIds.size
+          }));
           return;
         }
 
-        if (method === 'POST' && url === '/alert') {
+        if (method === 'GET' && parsedUrl.pathname === '/action') {
+          const reqId = parsedUrl.searchParams.get('id');
+          const since = parseInt(parsedUrl.searchParams.get('since') || '0', 10);
+
+          const matched = this.recentActions.find(a => {
+            const timeOk = a.timestamp >= since;
+            if (!timeOk) return false;
+            if (!reqId || !a.id) return true;
+            return a.id === reqId || reqId.includes(a.id) || a.id.includes(reqId);
+          });
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: true,
+            action: matched ? matched.action : null,
+            id: matched ? matched.id : null,
+            timestamp: matched ? matched.timestamp : null
+          }));
+          return;
+        }
+
+        if (method === 'POST' && parsedUrl.pathname === '/action') {
+          let body = '';
+          req.on('data', chunk => {
+            body += chunk;
+          });
+          req.on('end', () => {
+            try {
+              const data = JSON.parse(body);
+              this.recordRemoteAction({
+                id: data.id,
+                action: data.action || 'approve',
+                timestamp: data.timestamp || Date.now()
+              });
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: true, message: 'Action recorded' }));
+            } catch {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Invalid payload' }));
+            }
+          });
+          return;
+        }
+
+        if (method === 'POST' && parsedUrl.pathname === '/alert') {
           let body = '';
           req.on('data', chunk => {
             body += chunk;
@@ -138,7 +191,7 @@ export class AntigravityDetector implements IAgentDetector {
           return;
         }
 
-        if (method === 'POST' && url === '/resolve') {
+        if (method === 'POST' && parsedUrl.pathname === '/resolve') {
           let body = '';
           req.on('data', chunk => {
             body += chunk;
@@ -427,6 +480,292 @@ export class AntigravityDetector implements IAgentDetector {
       });
     }
     this.activePendingIds.clear();
+  }
+
+  public recordRemoteAction(action: { id?: string; action: string; timestamp?: number }): void {
+    const timestamp = action.timestamp || Date.now();
+    this.recentActions.unshift({ id: action.id, action: action.action, timestamp });
+    if (this.recentActions.length > 50) {
+      this.recentActions.pop();
+    }
+    if (action.id) {
+      this.activePendingIds.delete(action.id);
+      this.permissionResolvedEmitter.fire({
+        id: action.id,
+        agent: 'antigravity'
+      });
+    } else {
+      this.resolveAllPending();
+    }
+  }
+
+  /**
+   * Automatically configures .agents/hooks.json and .agents/scripts/heyhuman-hook.js
+   * in the user's workspace so Antigravity approvals flow seamlessly from mobile.
+   */
+  public async setupWorkspaceHook(): Promise<boolean> {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) {
+      vscode.window.showWarningMessage('HeyHuman: Open a workspace or project folder first to install the Antigravity hook.');
+      return false;
+    }
+
+    const rootPath = folders[0].uri.fsPath;
+    const agentsDir = path.join(rootPath, '.agents');
+    const scriptsDir = path.join(agentsDir, 'scripts');
+    const hooksJsonPath = path.join(agentsDir, 'hooks.json');
+    const hookScriptPath = path.join(scriptsDir, 'heyhuman-hook.js');
+
+    try {
+      if (!fs.existsSync(agentsDir)) {
+        fs.mkdirSync(agentsDir, { recursive: true });
+      }
+      if (!fs.existsSync(scriptsDir)) {
+        fs.mkdirSync(scriptsDir, { recursive: true });
+      }
+
+      const hooksConfig = {
+        'heyhuman-approval': {
+          enabled: true,
+          PreToolUse: [
+            {
+              matcher: 'run_command',
+              hooks: [
+                {
+                  type: 'command',
+                  command: 'node scripts/heyhuman-hook.js',
+                  timeout: 45
+                }
+              ]
+            }
+          ]
+        }
+      };
+
+      fs.writeFileSync(hooksJsonPath, JSON.stringify(hooksConfig, null, 2), 'utf-8');
+
+      // Hook script contents
+      const hookScriptCode = `#!/usr/bin/env node
+/**
+ * HeyHuman Antigravity Lifecycle Hook
+ * Intercepts tool calls (e.g. run_command with BypassSandbox: true).
+ * When approval is required:
+ *   1. Emits alert to HeyHuman companion and mobile room.
+ *   2. Waits up to 35s for mobile action (Approve / Reject).
+ *   3. If approved via phone: outputs { "decision": "allow" } -> Antigravity runs immediately!
+ *   4. If rejected via phone: outputs { "decision": "deny" } -> Antigravity cancels tool.
+ *   5. If timeout reached: outputs { "decision": "ask" } -> Falls back to desktop prompt.
+ */
+
+const http = require('http');
+const https = require('https');
+const fs = require('fs');
+const path = require('path');
+
+const COMPANION_PORT = 47291;
+const DEFAULT_ENDPOINT = 'https://hey-human-akdey.vercel.app';
+const TIMEOUT_SECONDS = 35;
+
+async function main() {
+  let inputRaw = '';
+  process.stdin.setEncoding('utf-8');
+  for await (const chunk of process.stdin) {
+    inputRaw += chunk;
+  }
+
+  let payload = {};
+  try {
+    payload = JSON.parse(inputRaw || '{}');
+  } catch {
+    outputDecision('ask', 'Could not parse hook input');
+    return;
+  }
+
+  const toolCall = payload.toolCall || {};
+  const toolName = toolCall.name || '';
+  const args = toolCall.args || {};
+  const stepIdx = payload.stepIdx ?? 0;
+
+  const isBypass = args.BypassSandbox === true || args.BypassSandbox === 'true';
+  const cmdStr = (args.CommandLine || '').toLowerCase();
+  const isDestructive = cmdStr.includes('rm -rf') || cmdStr.includes('git reset --hard') || cmdStr.includes('npm publish') || cmdStr.includes('drop database');
+  const isSensitive = isBypass || toolName === 'ask_question' || isDestructive;
+
+  if (!isSensitive) {
+    outputDecision('allow');
+    return;
+  }
+
+  const commandStr = args.CommandLine || toolName;
+  const alertId = \`ag-step-\${stepIdx}-hook-\${Date.now()}\`;
+
+  let room = process.env.HEYHUMAN_ROOM || '';
+  if (!room) {
+    try {
+      const companionStatus = await httpGetJson(\`http://127.0.0.1:\${COMPANION_PORT}/status\`);
+      if (companionStatus && companionStatus.room) {
+        room = companionStatus.room;
+      }
+    } catch {}
+  }
+
+  if (!room) {
+    try {
+      const settingsPath = path.join(process.cwd(), '.vscode', 'settings.json');
+      if (fs.existsSync(settingsPath)) {
+        const s = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+        room = s['heyhuman.webRoom'] || '';
+      }
+    } catch {}
+  }
+
+  if (!room) {
+    room = 'orbit-swift-551';
+  }
+
+  const alertPayload = {
+    id: alertId,
+    agent: 'ANTIGRAVITY',
+    type: 'Permission Request',
+    tool: toolName,
+    command: String(commandStr).slice(0, 150),
+    description: \`Antigravity wants to run: \${String(commandStr).slice(0, 100)}\`,
+    timestamp: Date.now()
+  };
+
+  httpPostJson(\`http://127.0.0.1:\${COMPANION_PORT}/alert\`, alertPayload).catch(() => {});
+
+  const webUrl = \`\${DEFAULT_ENDPOINT}/api/alert?room=\${encodeURIComponent(room)}\`;
+  await httpPostJson(webUrl, alertPayload).catch(() => {});
+
+  const startTime = Date.now();
+  const maxWaitMs = TIMEOUT_SECONDS * 1000;
+
+  while (Date.now() - startTime < maxWaitMs) {
+    await sleep(600);
+
+    try {
+      const compRes = await httpGetJson(\`http://127.0.0.1:\${COMPANION_PORT}/action?id=\${encodeURIComponent(alertId)}&since=\${startTime}\`);
+      if (compRes && compRes.action) {
+        if (compRes.action === 'approve') {
+          outputDecision('allow', 'Approved remotely via HeyHuman mobile app');
+          return;
+        } else if (compRes.action === 'reject') {
+          outputDecision('deny', 'Rejected remotely via HeyHuman mobile app');
+          return;
+        }
+      }
+    } catch {}
+
+    try {
+      const pollUrl = \`\${DEFAULT_ENDPOINT}/api/alert?room=\${encodeURIComponent(room)}&since=\${startTime - 1000}\`;
+      const webRes = await httpGetJson(pollUrl);
+      if (webRes && Array.isArray(webRes.actions)) {
+        for (const act of webRes.actions) {
+          if (act.timestamp >= startTime) {
+            if (act.action === 'approve') {
+              outputDecision('allow', 'Approved remotely via HeyHuman mobile app');
+              return;
+            } else if (act.action === 'reject') {
+              outputDecision('deny', 'Rejected remotely via HeyHuman mobile app');
+              return;
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+
+  outputDecision('ask', 'No mobile response received within timeout. Falling back to desktop prompt.');
+}
+
+function outputDecision(decision, reason) {
+  const result = { decision };
+  if (reason) result.reason = reason;
+  process.stdout.write(JSON.stringify(result) + '\\n');
+  process.exit(0);
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function httpGetJson(urlStr) {
+  return new Promise((resolve, reject) => {
+    const isHttps = urlStr.startsWith('https:');
+    const client = isHttps ? https : http;
+    const req = client.get(urlStr, { timeout: 3000 }, res => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+  });
+}
+
+function httpPostJson(urlStr, bodyObj) {
+  return new Promise((resolve, reject) => {
+    const isHttps = urlStr.startsWith('https:');
+    const client = isHttps ? https : http;
+    const bodyStr = JSON.stringify(bodyObj);
+    const parsed = new URL(urlStr);
+
+    const options = {
+      hostname: parsed.hostname,
+      port: parsed.port || (isHttps ? 443 : 80),
+      path: parsed.pathname + parsed.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(bodyStr)
+      },
+      timeout: 4000
+    };
+
+    const req = client.request(options, res => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch {
+          resolve({});
+        }
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    req.write(bodyStr);
+    req.end();
+  });
+}
+
+main().catch(() => {
+  outputDecision('ask', 'Hook error');
+});
+`;
+
+      fs.writeFileSync(hookScriptPath, hookScriptCode, 'utf-8');
+
+      if (process.platform !== 'win32' && fs.existsSync(hookScriptPath)) {
+        try {
+          fs.chmodSync(hookScriptPath, 0o755);
+        } catch {}
+      }
+
+      vscode.window.showInformationMessage('🚀 HeyHuman: Antigravity Mobile Approval Hook installed in .agents/hooks.json! Approvals from your phone will now auto-execute.');
+      return true;
+    } catch (err: any) {
+      vscode.window.showErrorMessage(`HeyHuman: Failed to install hook: ${err?.message || err}`);
+      return false;
+    }
   }
 
   public dispose(): void {
