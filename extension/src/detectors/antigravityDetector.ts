@@ -239,6 +239,59 @@ export class AntigravityDetector implements IAgentDetector {
   }
 
   /**
+   * Identifies whether the current editor host or system environment is Antigravity IDE.
+   */
+  public isAntigravityDetected(): { detected: boolean; reason: string } {
+    // 1. Host editor environment (e.g. running inside Antigravity IDE)
+    const appName = (typeof vscode !== 'undefined' && vscode.env && vscode.env.appName) ? vscode.env.appName : '';
+    if (/antigravity/i.test(appName)) {
+      return { detected: true, reason: `Running inside ${appName}` };
+    }
+
+    // 2. Executable host path
+    if (process.execPath && /antigravity/i.test(process.execPath)) {
+      return { detected: true, reason: 'Antigravity host process' };
+    }
+
+    // 3. App root
+    if (typeof vscode !== 'undefined' && vscode.env && vscode.env.appRoot && /antigravity/i.test(vscode.env.appRoot)) {
+      return { detected: true, reason: 'Antigravity application core' };
+    }
+
+    // 4. Built-in or installed Antigravity / Gemini extensions
+    if (typeof vscode !== 'undefined' && vscode.extensions) {
+      const hasAgExt = vscode.extensions.all.some(e =>
+        /antigravity/i.test(e.id) || /antigravity/i.test(e.packageJSON?.name || '')
+      );
+      if (hasAgExt) {
+        return { detected: true, reason: 'Antigravity extension active' };
+      }
+    }
+
+    // 5. Filesystem installation checks
+    const candidates = [
+      '/Applications/Antigravity IDE.app',
+      '/Applications/Antigravity.app',
+      '/Applications/Google Antigravity.app',
+      '/Applications/Google Antigravity IDE.app',
+      path.join(os.homedir(), 'Applications', 'Antigravity IDE.app'),
+      path.join(os.homedir(), 'Applications', 'Antigravity.app'),
+      path.join(os.homedir(), '.gemini', 'antigravity'),
+      path.join(os.homedir(), '.antigravity')
+    ];
+
+    for (const p of candidates) {
+      try {
+        if (fs.existsSync(p)) {
+          return { detected: true, reason: `Installed at ${path.basename(p)}` };
+        }
+      } catch {}
+    }
+
+    return { detected: false, reason: 'Waiting for Antigravity' };
+  }
+
+  /**
    * Scans for Antigravity conversation transcript files.
    */
   private scanAndWatchTranscripts(): void {
@@ -251,6 +304,21 @@ export class AntigravityDetector implements IAgentDetector {
       }
 
       try {
+        // Direct check: brainDir/.system_generated/logs/transcript.jsonl
+        const directLog = path.join(brainDir, '.system_generated', 'logs', 'transcript.jsonl');
+        if (fs.existsSync(directLog)) {
+          this.watchSingleTranscript(directLog);
+          transcriptCount++;
+        }
+
+        // Direct transcript: brainDir/transcript.jsonl
+        const flatLog = path.join(brainDir, 'transcript.jsonl');
+        if (fs.existsSync(flatLog)) {
+          this.watchSingleTranscript(flatLog);
+          transcriptCount++;
+        }
+
+        // Child folders: brainDir/<conv-id>/.system_generated/logs/transcript.jsonl
         const convFolders = fs.readdirSync(brainDir);
         for (const folder of convFolders) {
           const logDir = path.join(brainDir, folder, '.system_generated', 'logs');
@@ -267,22 +335,22 @@ export class AntigravityDetector implements IAgentDetector {
       }
     }
 
+    const detection = this.isAntigravityDetected();
+
     if (transcriptCount > 0 || this.watchedFiles.size > 0) {
       this.statusInfo = {
         status: 'active',
-        message: `Actively watching ${this.watchedFiles.size} Antigravity transcript(s) & companion port ${this.settings.getAntigravityCompanionPort()}`
+        message: `Active (${detection.reason} - watching ${this.watchedFiles.size} conversation transcript(s) & port ${this.settings.getAntigravityCompanionPort()})`
+      };
+    } else if (detection.detected) {
+      this.statusInfo = {
+        status: 'active',
+        message: `Active (${detection.reason} - companion port ${this.settings.getAntigravityCompanionPort()} ready)`
       };
     } else {
-      const isAntigravityInstalled =
-        fs.existsSync('/Applications/Antigravity IDE.app') ||
-        fs.existsSync('/Applications/Antigravity.app') ||
-        fs.existsSync(path.join(os.homedir(), '.gemini', 'antigravity'));
-
       this.statusInfo = {
-        status: isAntigravityInstalled ? 'idle' : 'warning',
-        message: isAntigravityInstalled
-          ? `Antigravity detected (companion port ${this.settings.getAntigravityCompanionPort()}; waiting for conversation)`
-          : 'Google Antigravity not found in default paths. Configure a custom path in settings.'
+        status: 'idle',
+        message: `Waiting for conversation (companion receiver active on port ${this.settings.getAntigravityCompanionPort()})`
       };
     }
   }
@@ -295,8 +363,23 @@ export class AntigravityDetector implements IAgentDetector {
       list.push(custom);
     }
 
-    const defaultBrain = path.join(os.homedir(), '.gemini', 'antigravity', 'brain');
-    list.push(defaultBrain);
+    const home = os.homedir();
+    // Default ~/.gemini/antigravity/brain and common locations
+    list.push(path.join(home, '.gemini', 'antigravity', 'brain'));
+    list.push(path.join(home, '.gemini', 'antigravity'));
+    list.push(path.join(home, '.antigravity', 'brain'));
+    list.push(path.join(home, '.antigravity'));
+    list.push(path.join(home, '.config', 'antigravity', 'brain'));
+    list.push(path.join(home, 'Library', 'Application Support', 'Antigravity', 'brain'));
+    list.push(path.join(home, 'Library', 'Application Support', 'Google', 'Antigravity', 'brain'));
+
+    // Check workspace folders
+    if (typeof vscode !== 'undefined' && vscode.workspace && vscode.workspace.workspaceFolders) {
+      for (const wf of vscode.workspace.workspaceFolders) {
+        list.push(path.join(wf.uri.fsPath, '.gemini', 'antigravity', 'brain'));
+        list.push(path.join(wf.uri.fsPath, '.agents'));
+      }
+    }
 
     return list;
   }

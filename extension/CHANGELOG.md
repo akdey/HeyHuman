@@ -2,6 +2,12 @@
 
 All notable changes to the "heyhuman" extension will be documented in this file.
 
+## [1.2.6] - 2026-10-13
+
+### Fixed
+- **Antigravity IDE Environment Detection**: Added deep runtime detection via `vscode.env.appName`, `process.execPath`, and `vscode.env.appRoot` so Antigravity IDE is instantly recognized as active without relying solely on static filesystem paths.
+- **Multi-Path Brain & Transcript Discovery**: Expanded brain transcript directory scanning across `~/.gemini/antigravity`, `~/.antigravity`, `Library/Application Support/Antigravity`, and workspace `.agents` / `.gemini` paths.
+
 ## [1.2.5] - 2026-10-13
 
 ### Added
