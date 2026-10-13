@@ -2,6 +2,14 @@
 
 All notable changes to the "heyhuman" extension will be documented in this file.
 
+## [1.2.4] - 2026-10-13
+
+### Added
+- **Multi-Choice Interactive Questionnaire UI**: Full mobile support for Google Antigravity's interactive questions (`ask_question`). Instead of generic "y/n" buttons, options 1, 2, 3, 4... are displayed as individual interactive buttons on the phone.
+- **Custom Write-In Response Input**: Developers can now type custom answers or notes directly from their phone and submit them to their desktop AI agent.
+- **Rich Web Push Option Banners**: Lock screen notification previews now list the available multiple-choice options (`[1] ... [2] ... [3] ...`).
+- **Clipboard Sync & Desktop Input Delivery**: Submitting an answer from the phone copies the response to the desktop clipboard, brings the IDE to focus, and dispatches the input to the agent.
+
 ## [1.2.3] - 2026-10-13
 
 ### Added

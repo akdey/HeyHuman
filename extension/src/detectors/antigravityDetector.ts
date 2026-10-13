@@ -391,10 +391,26 @@ export class AntigravityDetector implements IAgentDetector {
     // 1. Check for `ask_question` tool call
     const askQuestionCall = toolCalls.find((t: any) => t.name === 'ask_question');
     if (askQuestionCall) {
-      const questionData = askQuestionCall.args?.questions || askQuestionCall.args?.question || '';
-      const summaryText = typeof questionData === 'string' && questionData
-        ? questionData.slice(0, 80)
-        : 'User clarification requested';
+      const qArgs = askQuestionCall.args || {};
+      let parsedQuestions: Array<{ question: string; options: string[]; isMultiSelect?: boolean }> = [];
+
+      if (Array.isArray(qArgs.questions)) {
+        parsedQuestions = qArgs.questions.map((q: any) => ({
+          question: q.question || 'Please select an option',
+          options: Array.isArray(q.options) ? q.options.map((o: any) => String(o)) : [],
+          isMultiSelect: !!q.is_multi_select
+        }));
+      } else if (qArgs.question) {
+        parsedQuestions = [{
+          question: String(qArgs.question),
+          options: Array.isArray(qArgs.options) ? qArgs.options.map((o: any) => String(o)) : [],
+          isMultiSelect: !!qArgs.is_multi_select
+        }];
+      }
+
+      const firstQ = parsedQuestions[0];
+      const summaryText = firstQ ? firstQ.question.slice(0, 100) : 'User clarification requested';
+      const flatOptions = firstQ ? firstQ.options : [];
 
       const id = `ag-step-${stepIndex}-q`;
       this.activePendingIds.add(id);
@@ -404,8 +420,11 @@ export class AntigravityDetector implements IAgentDetector {
         agent: 'antigravity',
         type: 'question_input',
         state: 'pending',
-        summary: `Question: ${summaryText}`,
-        details: JSON.stringify(askQuestionCall.args),
+        summary: summaryText,
+        details: JSON.stringify(qArgs),
+        questions: parsedQuestions,
+        options: flatOptions,
+        allowCustomInput: true,
         timestamp: Date.now(),
         metadata: { stepIndex, sourcePath }
       };
@@ -432,6 +451,8 @@ export class AntigravityDetector implements IAgentDetector {
         state: 'pending',
         summary: `Terminal Permission: ${cleanCmd}`,
         details: String(cmd),
+        options: ['Allow Once', 'Always Allow', 'Deny'],
+        allowCustomInput: false,
         timestamp: Date.now(),
         metadata: { stepIndex, sourcePath }
       };
@@ -451,6 +472,8 @@ export class AntigravityDetector implements IAgentDetector {
         type: 'confirmation_dialog',
         state: 'pending',
         summary: 'Antigravity action awaiting user approval',
+        options: ['Approve (y)', 'Reject (n)'],
+        allowCustomInput: true,
         timestamp: Date.now(),
         metadata: { stepIndex, sourcePath }
       };

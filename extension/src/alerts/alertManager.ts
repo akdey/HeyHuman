@@ -91,6 +91,9 @@ export class AlertManager {
         tool: event.type,
         command: event.details || '',
         description: event.summary,
+        questions: event.questions || [],
+        options: event.options || [],
+        allowCustomInput: event.allowCustomInput ?? true,
         timestamp: event.timestamp
       };
 
@@ -108,7 +111,7 @@ export class AlertManager {
   }
 
   /**
-   * Polls for remote actions sent from mobile (Approve, Reject, Focus)
+   * Polls for remote actions sent from mobile (Approve, Reject, Focus, Answer)
    */
   private startRemoteActionPoller(): void {
     this.actionPollerTimer = setInterval(async () => {
@@ -137,7 +140,7 @@ export class AlertManager {
   }
 
   /**
-   * Executes remote approval or focus action on the desktop
+   * Executes remote approval, focus, or question answer action on desktop
    */
   private async handleRemoteAction(action: { id?: string; action: string; input?: string; timestamp?: number }): Promise<void> {
     console.log(`[HeyHuman] Executing remote action from phone: ${action.action}`);
@@ -145,18 +148,29 @@ export class AlertManager {
     // Broadcast remote action to agent detectors (e.g. Antigravity companion bridge)
     this.remoteActionEmitter.fire(action);
 
-    if (action.action === 'approve') {
-      // 1. Bring window to front
+    if (action.action === 'answer' || (action.input && action.action !== 'reject')) {
+      const input = action.input || 'y';
       this.notificationManager.bringWindowToFront();
 
-      // 2. Send approval input to active terminal (Claude Code / Aider / CLI)
-      const input = action.input || 'y';
+      // Copy answer to clipboard for instant access
+      vscode.env.clipboard.writeText(input);
+
+      // Send to active terminal
       if (vscode.window.activeTerminal) {
         vscode.window.activeTerminal.sendText(input);
       } else if (vscode.window.terminals.length > 0) {
         vscode.window.terminals[0].sendText(input);
       }
 
+      vscode.window.showInformationMessage(`📱 HeyHuman: Remote Answer applied: '${input}' (copied to clipboard)`);
+    } else if (action.action === 'approve') {
+      this.notificationManager.bringWindowToFront();
+      const input = action.input || 'y';
+      if (vscode.window.activeTerminal) {
+        vscode.window.activeTerminal.sendText(input);
+      } else if (vscode.window.terminals.length > 0) {
+        vscode.window.terminals[0].sendText(input);
+      }
       vscode.window.showInformationMessage(`📱 HeyHuman: Remote Approval applied ('${input}') from mobile.`);
     } else if (action.action === 'reject') {
       this.notificationManager.bringWindowToFront();

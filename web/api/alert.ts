@@ -8,14 +8,23 @@ export interface AlertItem {
   tool?: string;
   command?: string;
   description?: string;
+  questions?: Array<{
+    question: string;
+    options: string[];
+    isMultiSelect?: boolean;
+  }>;
+  options?: string[];
+  allowCustomInput?: boolean;
   timestamp: number;
   resolved?: boolean;
 }
 
 export interface RemoteAction {
   id: string;
-  action: 'approve' | 'reject' | 'focus';
+  action: 'approve' | 'reject' | 'focus' | 'answer';
   input?: string;
+  selectionIndex?: number;
+  selectionText?: string;
   timestamp: number;
 }
 
@@ -113,12 +122,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // 3. Remote command approval / action from Phone!
-    if (body.action === 'approve' || body.action === 'reject' || body.action === 'focus') {
+    // 3. Remote command approval / action / answer from Phone!
+    if (body.action === 'approve' || body.action === 'reject' || body.action === 'focus' || body.action === 'answer') {
       const actionItem: RemoteAction = {
         id: body.id || `act_${Date.now()}`,
         action: body.action,
-        input: body.input || (body.action === 'approve' ? 'y' : 'n'),
+        input: body.input || (body.action === 'approve' ? 'y' : body.action === 'reject' ? 'n' : ''),
+        selectionIndex: body.selectionIndex,
+        selectionText: body.selectionText,
         timestamp: Date.now()
       };
 
@@ -157,6 +168,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tool: body.tool || body.type || 'Action Approval',
       command: commandValue,
       description: descriptionValue,
+      questions: Array.isArray(body.questions) ? body.questions : undefined,
+      options: Array.isArray(body.options) ? body.options : undefined,
+      allowCustomInput: body.allowCustomInput ?? true,
       timestamp: Date.now(),
       resolved: false
     };
@@ -169,9 +183,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const subs = roomPushSubscriptions.get(roomId) || [];
     let pushSuccessCount = 0;
     if (subs.length > 0) {
+      let pushBody = newAlert.description;
+      if (newAlert.options && newAlert.options.length > 0) {
+        pushBody = `Options: ${newAlert.options.slice(0, 3).map((o, idx) => `[${idx + 1}] ${o}`).join('  ')}`;
+      } else if (newAlert.command) {
+        pushBody = `Command: ${newAlert.command}`;
+      }
+
       const pushPayload = JSON.stringify({
-        title: `🚨 ${newAlert.agent} Needs Approval`,
-        body: newAlert.command ? `Command: ${newAlert.command}` : newAlert.description,
+        title: `🚨 ${newAlert.agent}: ${newAlert.description ? newAlert.description.slice(0, 40) : 'Needs Input'}`,
+        body: pushBody,
         tag: newAlert.id,
         room: roomId,
         url: `/?room=${encodeURIComponent(roomId)}`

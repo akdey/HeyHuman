@@ -27,8 +27,36 @@ interface AlertItem {
   tool?: string;
   command?: string;
   description?: string;
+  questions?: Array<{
+    question: string;
+    options: string[];
+    isMultiSelect?: boolean;
+  }>;
+  options?: string[];
+  allowCustomInput?: boolean;
   timestamp: number;
   resolved?: boolean;
+}
+
+function extractOptions(alert: AlertItem): string[] {
+  if (Array.isArray(alert.options) && alert.options.length > 0) {
+    return alert.options;
+  }
+  if (Array.isArray(alert.questions) && alert.questions.length > 0) {
+    return alert.questions[0].options || [];
+  }
+  if (alert.command && alert.command.includes('"options"')) {
+    try {
+      const parsed = JSON.parse(alert.command);
+      if (Array.isArray(parsed.questions) && parsed.questions[0]?.options) {
+        return parsed.questions[0].options;
+      }
+      if (Array.isArray(parsed.options)) {
+        return parsed.options;
+      }
+    } catch {}
+  }
+  return [];
 }
 
 const STORAGE_KEY = 'heyhuman_room';
@@ -55,6 +83,7 @@ export function App() {
   const [showQR, setShowQR] = useState<boolean>(false);
 
   const [isPushSubscribed, setIsPushSubscribed] = useState<boolean>(false);
+  const [customInputText, setCustomInputText] = useState<string>('');
 
   const lastSeenIdRef = useRef<string | null>(null);
   const pollerRef = useRef<number | null>(null);
@@ -262,8 +291,13 @@ export function App() {
     });
   };
 
-  const handleRemoteAction = (id: string, action: 'approve' | 'reject' | 'focus') => {
-    if (action === 'approve') {
+  const handleRemoteAction = (
+    id: string, 
+    action: 'approve' | 'reject' | 'focus' | 'answer',
+    input?: string,
+    selectionIndex?: number
+  ) => {
+    if (action === 'approve' || action === 'answer') {
       confetti({
         particleCount: 50,
         spread: 70,
@@ -277,7 +311,13 @@ export function App() {
     fetch(`/api/alert?room=${encodeURIComponent(room)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, action })
+      body: JSON.stringify({ 
+        id, 
+        action, 
+        input: input || (action === 'approve' ? 'y' : action === 'reject' ? 'n' : ''),
+        selectionIndex,
+        selectionText: input
+      })
     }).catch(() => {});
   };
 
@@ -473,8 +513,8 @@ export function App() {
               </p>
             </div>
 
-            {/* Code / Command Inspection Terminal Block */}
-            {pendingAlert.command && (
+            {/* Code / Command Inspection Terminal Block (Only for real shell commands) */}
+            {pendingAlert.command && !(pendingAlert.command.trim().startsWith('{') || pendingAlert.command.trim().startsWith('[')) && (
               <div style={{
                 width: '100%',
                 background: 'rgba(0, 0, 0, 0.55)',
@@ -513,55 +553,223 @@ export function App() {
               </div>
             )}
 
-            {/* Primary Action Buttons (Apple Segmented Style) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', width: '100%' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.55rem', width: '100%' }}>
-                {/* Approve Primary Button */}
-                <button
-                  onClick={() => handleRemoteAction(pendingAlert.id, 'approve')}
-                  style={{
-                    background: '#34c759',
-                    color: '#000000',
-                    border: 'none',
-                    borderRadius: '14px',
-                    padding: '0.85rem 1rem',
-                    fontSize: '0.9rem',
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.4rem',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 18px rgba(52, 199, 89, 0.35)',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <CheckCircle2 size={17} />
-                  Approve (y)
-                </button>
+            {/* Action Area: Options 1, 2, 3, 4 OR Binary Approve / Reject */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
+              {(() => {
+                const optionsList = extractOptions(pendingAlert);
 
-                {/* Reject Button */}
-                <button
-                  onClick={() => handleRemoteAction(pendingAlert.id, 'reject')}
-                  style={{
-                    background: 'rgba(255, 59, 48, 0.12)',
-                    color: 'var(--accent-red)',
-                    border: '1px solid rgba(255, 59, 48, 0.25)',
-                    borderRadius: '14px',
-                    padding: '0.85rem 1rem',
-                    fontSize: '0.88rem',
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.35rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  Reject (n)
-                </button>
-              </div>
+                if (optionsList.length > 0) {
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', width: '100%' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Select Option (1, 2, 3...):
+                      </span>
+                      {optionsList.map((opt, idx) => {
+                        const isRecommended = opt.toLowerCase().includes('(recommended)');
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => handleRemoteAction(pendingAlert.id, 'answer', opt, idx + 1)}
+                            style={{
+                              background: isRecommended ? 'rgba(52, 199, 89, 0.14)' : 'rgba(255, 255, 255, 0.05)',
+                              border: `1px solid ${isRecommended ? 'rgba(52, 199, 89, 0.4)' : 'var(--border)'}`,
+                              borderRadius: '14px',
+                              padding: '0.8rem 1rem',
+                              color: isRecommended ? '#4ade80' : 'var(--text-1)',
+                              fontSize: '0.86rem',
+                              fontWeight: 600,
+                              textAlign: 'left',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              boxShadow: isRecommended ? '0 4px 14px rgba(52, 199, 89, 0.15)' : 'none'
+                            }}
+                          >
+                            <span style={{
+                              background: isRecommended ? 'var(--accent-green)' : 'rgba(255, 255, 255, 0.1)',
+                              color: isRecommended ? '#000000' : 'var(--text-2)',
+                              borderRadius: '8px',
+                              width: '24px',
+                              height: '24px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              flexShrink: 0
+                            }}>
+                              {idx + 1}
+                            </span>
+                            <span style={{ flex: 1, lineHeight: '1.3' }}>{opt}</span>
+                          </button>
+                        );
+                      })}
+
+                      {/* Custom write-in text response */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        background: 'rgba(0, 0, 0, 0.45)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '14px',
+                        padding: '0.35rem 0.45rem 0.35rem 0.85rem',
+                        marginTop: '0.35rem',
+                        gap: '0.4rem'
+                      }}>
+                        <input
+                          type="text"
+                          value={customInputText}
+                          onChange={e => setCustomInputText(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && customInputText.trim()) {
+                              handleRemoteAction(pendingAlert.id, 'answer', customInputText.trim());
+                              setCustomInputText('');
+                            }
+                          }}
+                          placeholder="Or type custom answer / note..."
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#ffffff',
+                            fontSize: '0.84rem',
+                            outline: 'none'
+                          }}
+                        />
+                        <button
+                          disabled={!customInputText.trim()}
+                          onClick={() => {
+                            if (customInputText.trim()) {
+                              handleRemoteAction(pendingAlert.id, 'answer', customInputText.trim());
+                              setCustomInputText('');
+                            }
+                          }}
+                          style={{
+                            background: customInputText.trim() ? 'var(--accent-blue)' : 'rgba(255, 255, 255, 0.08)',
+                            color: customInputText.trim() ? '#ffffff' : 'var(--text-3)',
+                            border: 'none',
+                            borderRadius: '10px',
+                            padding: '0.55rem 0.85rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            cursor: customInputText.trim() ? 'pointer' : 'default'
+                          }}
+                        >
+                          Send
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Standard Binary Approve / Reject for terminal commands
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', width: '100%' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.55rem', width: '100%' }}>
+                      <button
+                        onClick={() => handleRemoteAction(pendingAlert.id, 'approve')}
+                        style={{
+                          background: '#34c759',
+                          color: '#000000',
+                          border: 'none',
+                          borderRadius: '14px',
+                          padding: '0.85rem 1rem',
+                          fontSize: '0.9rem',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.4rem',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 18px rgba(52, 199, 89, 0.35)',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <CheckCircle2 size={17} />
+                        Approve (y)
+                      </button>
+
+                      <button
+                        onClick={() => handleRemoteAction(pendingAlert.id, 'reject')}
+                        style={{
+                          background: 'rgba(255, 59, 48, 0.12)',
+                          color: 'var(--accent-red)',
+                          border: '1px solid rgba(255, 59, 48, 0.25)',
+                          borderRadius: '14px',
+                          padding: '0.85rem 1rem',
+                          fontSize: '0.88rem',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.35rem',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        Reject (n)
+                      </button>
+                    </div>
+
+                    {/* Custom write-in text response for command input */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: 'rgba(0, 0, 0, 0.45)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '14px',
+                      padding: '0.35rem 0.45rem 0.35rem 0.85rem',
+                      gap: '0.4rem'
+                    }}>
+                      <input
+                        type="text"
+                        value={customInputText}
+                        onChange={e => setCustomInputText(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && customInputText.trim()) {
+                            handleRemoteAction(pendingAlert.id, 'answer', customInputText.trim());
+                            setCustomInputText('');
+                          }
+                        }}
+                        placeholder="Type response / input..."
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#ffffff',
+                          fontSize: '0.84rem',
+                          outline: 'none'
+                        }}
+                      />
+                      <button
+                        disabled={!customInputText.trim()}
+                        onClick={() => {
+                          if (customInputText.trim()) {
+                            handleRemoteAction(pendingAlert.id, 'answer', customInputText.trim());
+                            setCustomInputText('');
+                          }
+                        }}
+                        style={{
+                          background: customInputText.trim() ? 'var(--accent-blue)' : 'rgba(255, 255, 255, 0.08)',
+                          color: customInputText.trim() ? '#ffffff' : 'var(--text-3)',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '0.55rem 0.85rem',
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
+                          cursor: customInputText.trim() ? 'pointer' : 'default'
+                        }}
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Auxiliary Controls */}
               <div style={{ display: 'flex', gap: '0.55rem', width: '100%' }}>
