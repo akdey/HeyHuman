@@ -56,26 +56,35 @@ async function main() {
   const commandStr = args.CommandLine || toolName;
   const alertId = `ag-step-${stepIdx}-hook-${Date.now()}`;
 
-  // 3. Resolve active room ID
+  // 3. Resolve active room ID and phone alerts preference
+  let phoneAlertsEnabled = false;
   let room = process.env.HEYHUMAN_ROOM || '';
-  if (!room) {
-    try {
-      const companionStatus = await httpGetJson(`http://127.0.0.1:${COMPANION_PORT}/status`);
-      if (companionStatus && companionStatus.room) {
+  try {
+    const companionStatus = await httpGetJson(`http://127.0.0.1:${COMPANION_PORT}/status`);
+    if (companionStatus) {
+      if (!room && companionStatus.room) {
         room = companionStatus.room;
       }
-    } catch {
-      // Companion server may not be up
+      if (companionStatus.phoneAlertsEnabled !== undefined) {
+        phoneAlertsEnabled = Boolean(companionStatus.phoneAlertsEnabled);
+      }
     }
+  } catch {
+    // Companion server may not be up
   }
 
-  if (!room) {
+  if (!room || !phoneAlertsEnabled) {
     try {
       // Check VS Code global settings or workspace settings
       const settingsPath = path.join(process.cwd(), '.vscode', 'settings.json');
       if (fs.existsSync(settingsPath)) {
         const s = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-        room = s['heyhuman.webRoom'] || '';
+        if (!room) {
+          room = s['heyhuman.webRoom'] || '';
+        }
+        if (s['heyhuman.phoneAlerts.enabled'] !== undefined) {
+          phoneAlertsEnabled = Boolean(s['heyhuman.phoneAlerts.enabled']);
+        }
       }
     } catch {}
   }
@@ -98,9 +107,11 @@ async function main() {
   // Notify companion server (local desktop)
   httpPostJson(`http://127.0.0.1:${COMPANION_PORT}/alert`, alertPayload).catch(() => {});
 
-  // Notify web relay (mobile phone & Web Push)
-  const webUrl = `${DEFAULT_ENDPOINT}/api/alert?room=${encodeURIComponent(room)}`;
-  await httpPostJson(webUrl, alertPayload).catch(() => {});
+  // Notify web relay (mobile phone & Web Push) ONLY if phone alerts are enabled
+  if (phoneAlertsEnabled && room) {
+    const webUrl = `${DEFAULT_ENDPOINT}/api/alert?room=${encodeURIComponent(room)}`;
+    await httpPostJson(webUrl, alertPayload).catch(() => {});
+  }
 
   // 5. Poll for remote approval or rejection from mobile phone
   const startTime = Date.now();
@@ -123,24 +134,26 @@ async function main() {
       }
     } catch {}
 
-    // Check web relay
-    try {
-      const pollUrl = `${DEFAULT_ENDPOINT}/api/alert?room=${encodeURIComponent(room)}&since=${startTime - 1000}`;
-      const webRes = await httpGetJson(pollUrl);
-      if (webRes && Array.isArray(webRes.actions)) {
-        for (const act of webRes.actions) {
-          if (act.timestamp >= startTime) {
-            if (act.action === 'approve') {
-              outputDecision('allow', 'Approved remotely via HeyHuman mobile app');
-              return;
-            } else if (act.action === 'reject') {
-              outputDecision('deny', 'Rejected remotely via HeyHuman mobile app');
-              return;
+    // Check web relay ONLY if phone alerts are enabled
+    if (phoneAlertsEnabled && room) {
+      try {
+        const pollUrl = `${DEFAULT_ENDPOINT}/api/alert?room=${encodeURIComponent(room)}&since=${startTime - 1000}`;
+        const webRes = await httpGetJson(pollUrl);
+        if (webRes && Array.isArray(webRes.actions)) {
+          for (const act of webRes.actions) {
+            if (act.timestamp >= startTime) {
+              if (act.action === 'approve') {
+                outputDecision('allow', 'Approved remotely via HeyHuman mobile app');
+                return;
+              } else if (act.action === 'reject') {
+                outputDecision('deny', 'Rejected remotely via HeyHuman mobile app');
+                return;
+              }
             }
           }
         }
-      }
-    } catch {}
+      } catch {}
+    }
   }
 
   // 6. Timed out waiting for mobile response: fall back to desktop prompt
