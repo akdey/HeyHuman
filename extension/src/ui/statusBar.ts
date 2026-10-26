@@ -57,6 +57,7 @@ export class StatusBarController implements vscode.Disposable {
       'HeyHuman: AI Permission Alerts Active',
       '─────────────────────────',
       `Sound: ${this.settings.isSoundEnabled() ? this.settings.getSoundType() : 'Disabled'} (${this.settings.getSoundVolume()}%)`,
+      `Phone Alerts: ${this.settings.isPhoneAlertsEnabled() ? `Enabled (${this.settings.getWebRoom() || 'default'})` : 'Disabled'}`,
       `Copilot Alerts: ${this.settings.isAgentEnabled('copilot') ? 'Enabled' : 'Disabled'}`,
       `Antigravity Alerts: ${this.settings.isAgentEnabled('antigravity') ? 'Enabled' : 'Disabled'}`,
       '─────────────────────────',

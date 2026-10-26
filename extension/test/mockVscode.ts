@@ -16,7 +16,8 @@ const configStore: Record<string, any> = {
   'heyhuman.alerts.temporaryMuteDurationMinutes': 15,
   'heyhuman.antigravity.customLogPath': '',
   'heyhuman.antigravity.companionPort': 47291,
-  'heyhuman.copilot.customLogPath': ''
+  'heyhuman.copilot.customLogPath': '',
+  'heyhuman.phoneAlerts.enabled': false
 };
 
 class EventEmitter<T> {

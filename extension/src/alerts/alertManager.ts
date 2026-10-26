@@ -67,9 +67,9 @@ export class AlertManager {
       });
     }
 
-    // 7. Dispatch to Mobile Web App room if configured
+    // 7. Dispatch to Mobile Web App room if configured and enabled
     const webRoom = this.settings.getWebRoom();
-    if (webRoom) {
+    if (webRoom && this.settings.isPhoneAlertsEnabled()) {
       this.dispatchWebAlert(event, webRoom).catch((err) => {
         console.warn('[HeyHuman] Web alert dispatch error:', err);
       });
@@ -82,6 +82,9 @@ export class AlertManager {
    * Dispatches the alert to the HeyHuman web app room for mobile sirens
    */
   private async dispatchWebAlert(event: PermissionEvent, room: string): Promise<void> {
+    if (!this.settings.isPhoneAlertsEnabled()) {
+      return;
+    }
     try {
       const endpoint = this.settings.getWebEndpoint();
       const url = `${endpoint.replace(/\/+$/, '')}/api/alert?room=${encodeURIComponent(room)}`;
@@ -115,6 +118,9 @@ export class AlertManager {
    */
   private startRemoteActionPoller(): void {
     this.actionPollerTimer = setInterval(async () => {
+      if (!this.settings.isPhoneAlertsEnabled()) {
+        return;
+      }
       const room = this.settings.getWebRoom();
       if (!room) return;
 

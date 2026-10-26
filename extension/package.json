@@ -2,7 +2,7 @@
   "name": "heyhuman",
   "displayName": "HeyHuman",
   "description": "Your AI is waiting. Permission required. Audible alerts when AI coding agents need your approval.",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "publisher": "akdey",
   "license": "MIT",
   "repository": {
@@ -67,6 +67,10 @@
       {
         "command": "heyhuman.setWebRoom",
         "title": "HeyHuman: Set Web Room ID"
+      },
+      {
+        "command": "heyhuman.togglePhoneAlerts",
+        "title": "HeyHuman: Toggle Phone Notifications"
       },
       {
         "command": "heyhuman.setupAntigravityHook",
@@ -172,6 +176,11 @@
           "type": "string",
           "default": "",
           "description": "Custom path for Copilot chat transcripts or logs (leave empty for auto-detection)."
+        },
+        "heyhuman.phoneAlerts.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Send permission alerts and notifications to your mobile phone (via Web App / PWA). When disabled, no network or API calls are made."
         },
         "heyhuman.webRoom": {
           "type": "string",

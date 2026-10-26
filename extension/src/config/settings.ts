@@ -135,7 +135,18 @@ export class SettingsManager {
     return this.getConfig().get<string>('aider.customLogPath', '').trim();
   }
 
-  // Webhook / Web App Room Sync
+  // Webhook / Web App Room & Mobile Phone Sync
+  public isPhoneAlertsEnabled(): boolean {
+    if (!this.isEnabled()) {
+      return false;
+    }
+    return this.getConfig().get<boolean>('phoneAlerts.enabled', false);
+  }
+
+  public async setPhoneAlertsEnabled(value: boolean): Promise<void> {
+    await this.getConfig().update('phoneAlerts.enabled', value, vscode.ConfigurationTarget.Global);
+  }
+
   public getWebRoom(): string {
     return this.getConfig().get<string>('webRoom', '').trim();
   }

@@ -110,6 +110,7 @@ export class AntigravityDetector implements IAgentDetector {
             status: 'ok',
             service: 'HeyHuman Antigravity Companion',
             room: this.settings.getWebRoom(),
+            phoneAlertsEnabled: this.settings.isPhoneAlertsEnabled(),
             pendingCount: this.activePendingIds.size
           }));
           return;
@@ -722,22 +723,31 @@ async function main() {
   const commandStr = args.CommandLine || toolName;
   const alertId = \`ag-step-\${stepIdx}-hook-\${Date.now()}\`;
 
+  let phoneAlertsEnabled = false;
   let room = process.env.HEYHUMAN_ROOM || '';
-  if (!room) {
-    try {
-      const companionStatus = await httpGetJson(\`http://127.0.0.1:\${COMPANION_PORT}/status\`);
-      if (companionStatus && companionStatus.room) {
+  try {
+    const companionStatus = await httpGetJson(\`http://127.0.0.1:\${COMPANION_PORT}/status\`);
+    if (companionStatus) {
+      if (!room && companionStatus.room) {
         room = companionStatus.room;
       }
-    } catch {}
-  }
+      if (companionStatus.phoneAlertsEnabled !== undefined) {
+        phoneAlertsEnabled = Boolean(companionStatus.phoneAlertsEnabled);
+      }
+    }
+  } catch {}
 
-  if (!room) {
+  if (!room || !phoneAlertsEnabled) {
     try {
       const settingsPath = path.join(process.cwd(), '.vscode', 'settings.json');
       if (fs.existsSync(settingsPath)) {
         const s = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-        room = s['heyhuman.webRoom'] || '';
+        if (!room) {
+          room = s['heyhuman.webRoom'] || '';
+        }
+        if (s['heyhuman.phoneAlerts.enabled'] !== undefined) {
+          phoneAlertsEnabled = Boolean(s['heyhuman.phoneAlerts.enabled']);
+        }
       }
     } catch {}
   }
@@ -758,8 +768,10 @@ async function main() {
 
   httpPostJson(\`http://127.0.0.1:\${COMPANION_PORT}/alert\`, alertPayload).catch(() => {});
 
-  const webUrl = \`\${DEFAULT_ENDPOINT}/api/alert?room=\${encodeURIComponent(room)}\`;
-  await httpPostJson(webUrl, alertPayload).catch(() => {});
+  if (phoneAlertsEnabled && room) {
+    const webUrl = \`\${DEFAULT_ENDPOINT}/api/alert?room=\${encodeURIComponent(room)}\`;
+    await httpPostJson(webUrl, alertPayload).catch(() => {});
+  }
 
   const startTime = Date.now();
   const maxWaitMs = TIMEOUT_SECONDS * 1000;
@@ -780,23 +792,25 @@ async function main() {
       }
     } catch {}
 
-    try {
-      const pollUrl = \`\${DEFAULT_ENDPOINT}/api/alert?room=\${encodeURIComponent(room)}&since=\${startTime - 1000}\`;
-      const webRes = await httpGetJson(pollUrl);
-      if (webRes && Array.isArray(webRes.actions)) {
-        for (const act of webRes.actions) {
-          if (act.timestamp >= startTime) {
-            if (act.action === 'approve' || (act.action === 'submit_permission' && act.selectionIndex !== 4)) {
-              outputDecision('allow', 'Approved remotely via HeyHuman mobile app');
-              return;
-            } else if (act.action === 'reject' || (act.action === 'submit_permission' && act.selectionIndex === 4)) {
-              outputDecision('deny', act.input || 'Rejected remotely via HeyHuman mobile app');
-              return;
+    if (phoneAlertsEnabled && room) {
+      try {
+        const pollUrl = \`\${DEFAULT_ENDPOINT}/api/alert?room=\${encodeURIComponent(room)}&since=\${startTime - 1000}\`;
+        const webRes = await httpGetJson(pollUrl);
+        if (webRes && Array.isArray(webRes.actions)) {
+          for (const act of webRes.actions) {
+            if (act.timestamp >= startTime) {
+              if (act.action === 'approve' || (act.action === 'submit_permission' && act.selectionIndex !== 4)) {
+                outputDecision('allow', 'Approved remotely via HeyHuman mobile app');
+                return;
+              } else if (act.action === 'reject' || (act.action === 'submit_permission' && act.selectionIndex === 4)) {
+                outputDecision('deny', act.input || 'Rejected remotely via HeyHuman mobile app');
+                return;
+              }
             }
           }
         }
-      }
-    } catch {}
+      } catch {}
+    }
   }
 
   outputDecision('ask', 'No mobile response received within timeout. Falling back to desktop prompt.');

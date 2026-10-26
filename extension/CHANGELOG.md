@@ -2,6 +2,13 @@
 
 All notable changes to the "heyhuman" extension will be documented in this file.
 
+## [1.2.7] - 2026-10-13
+
+### Added
+- **Opt-in Phone Notifications Setting**: Added `heyhuman.phoneAlerts.enabled` (default `false`). When disabled, the extension enforces zero network calls—no web alert dispatching (`POST`) and no remote action polling (`GET`).
+- **Quick Toggle Command**: Added `HeyHuman: Toggle Phone Notifications` command (`heyhuman.togglePhoneAlerts`) and quick-pick entry in the status bar menu.
+- **Hook & Companion Awareness**: Local companion server and workspace hooks now respect the phone notifications flag, ensuring alerts remain strictly local unless the developer opts in.
+
 ## [1.2.6] - 2026-10-13
 
 ### Fixed

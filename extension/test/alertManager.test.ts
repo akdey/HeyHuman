@@ -216,4 +216,65 @@ describe('AlertManager', () => {
     const testResult = await alertManager.testSound();
     assert.strictEqual(testResult, false);
   });
+
+  it('does NOT make network calls to web relay when phone alerts are disabled', async () => {
+    await settings.setWebRoom('test-room');
+    await settings.setPhoneAlertsEnabled(false);
+
+    let fetchCalled = false;
+    const originalFetch = globalThis.fetch;
+    (globalThis as any).fetch = async () => {
+      fetchCalled = true;
+      return { ok: true } as any;
+    };
+
+    try {
+      const event: PermissionEvent = {
+        id: 'phone-test-1',
+        agent: 'antigravity',
+        type: 'terminal_command',
+        state: 'pending',
+        summary: 'Antigravity run command',
+        timestamp: Date.now()
+      };
+
+      const triggered = await alertManager.triggerAlert(event);
+      assert.strictEqual(triggered, true);
+      assert.strictEqual(fetchCalled, false, 'Fetch must not be called when phone alerts are disabled');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('dispatches web alert when phone alerts are enabled and web room is set', async () => {
+    await settings.setWebRoom('test-room');
+    await settings.setPhoneAlertsEnabled(true);
+
+    let calledUrl = '';
+    let calledBody: any = null;
+    const originalFetch = globalThis.fetch;
+    (globalThis as any).fetch = async (url: string, opts?: any) => {
+      calledUrl = url;
+      calledBody = opts && opts.body ? JSON.parse(opts.body) : null;
+      return { ok: true } as any;
+    };
+
+    try {
+      const event: PermissionEvent = {
+        id: 'phone-test-2',
+        agent: 'antigravity',
+        type: 'terminal_command',
+        state: 'pending',
+        summary: 'Antigravity run command',
+        timestamp: Date.now()
+      };
+
+      const triggered = await alertManager.triggerAlert(event);
+      assert.strictEqual(triggered, true);
+      assert.strictEqual(calledUrl.includes('/api/alert?room=test-room'), true);
+      assert.strictEqual(calledBody?.id, 'phone-test-2');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

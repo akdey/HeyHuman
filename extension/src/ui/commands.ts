@@ -94,6 +94,7 @@ export function registerCommands(
         `• Master Enabled: ${settings.isEnabled() ? 'Yes' : 'No'}`,
         `• Temporary Mute: ${settings.isMuted() ? `Active (${settings.getMuteRemainingMinutes()}m left)` : 'No'}`,
         `• Sound: ${settings.isSoundEnabled() ? settings.getSoundType() : 'Disabled'} (${settings.getSoundVolume()}%)`,
+        `• Phone Alerts: ${settings.isPhoneAlertsEnabled() ? `Enabled (Room: ${settings.getWebRoom() || 'default'})` : 'Disabled (Zero API calls)'}`,
         `• Notifications: ${settings.isNotificationsEnabled() ? 'Enabled' : 'Disabled'}`,
         `• Alert Cooldown: ${settings.getCooldownSeconds()}s`,
         '',
@@ -123,11 +124,25 @@ export function registerCommands(
       if (input !== undefined) {
         await settings.setWebRoom(input);
         if (input.trim()) {
-          vscode.window.showInformationMessage(`📡 HeyHuman paired to Web Room: ${input.trim()}`);
+          await settings.setPhoneAlertsEnabled(true);
+          vscode.window.showInformationMessage(`📡 HeyHuman paired to Web Room: ${input.trim()} (Phone notifications enabled)`);
         } else {
+          await settings.setPhoneAlertsEnabled(false);
           vscode.window.showInformationMessage('📡 HeyHuman Web Room disabled.');
         }
       }
+    })
+  );
+
+  // 10. Toggle Phone Notifications
+  context.subscriptions.push(
+    vscode.commands.registerCommand('heyhuman.togglePhoneAlerts', async () => {
+      const current = settings.isPhoneAlertsEnabled();
+      await settings.setPhoneAlertsEnabled(!current);
+      const msg = !current
+        ? `📱 HeyHuman phone notifications enabled (Room: ${settings.getWebRoom() || 'default'}).`
+        : '📱 HeyHuman phone notifications disabled (Zero API calls).';
+      vscode.window.showInformationMessage(msg);
     })
   );
 
@@ -171,6 +186,12 @@ export function registerCommands(
           description: 'View active detectors and connection states'
         },
         {
+          label: settings.isPhoneAlertsEnabled() ? '$(device-mobile) Disable Phone Alerts' : '$(device-mobile) Enable Phone Alerts',
+          description: settings.isPhoneAlertsEnabled()
+            ? `Active for room '${settings.getWebRoom() || 'default'}'`
+            : 'Opt-in to send alerts to mobile phone'
+        },
+        {
           label: '$(broadcast) Pair Web Alert Room...',
           description: settings.getWebRoom() ? `Currently paired to '${settings.getWebRoom()}'` : 'Stream sirens to your mobile phone'
         },
@@ -192,6 +213,8 @@ export function registerCommands(
         await vscode.commands.executeCommand('heyhuman.disableAlerts');
       } else if (selection.label.includes('Enable Alerts')) {
         await vscode.commands.executeCommand('heyhuman.enableAlerts');
+      } else if (selection.label.includes('Disable Phone Alerts') || selection.label.includes('Enable Phone Alerts')) {
+        await vscode.commands.executeCommand('heyhuman.togglePhoneAlerts');
       } else if (selection.label.includes('Unmute Alerts')) {
         await vscode.commands.executeCommand('heyhuman.unmute');
       } else if (selection.label.includes('Mute Temporarily')) {
