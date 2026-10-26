@@ -2,6 +2,20 @@
 
 All notable changes to the "heyhuman" extension will be documented in this file.
 
+## [1.3.0] - 2026-10-26
+
+### Added
+- **Notification Trigger Checkboxes (`heyhuman.notifyOn.*`)**: Added granular toggle checkboxes in VS Code Settings (`Cmd+,`) allowing developers to select exactly which events trigger alerts:
+  - `heyhuman.notifyOn.permissionNeeded` (default `true`): Trigger alert when an AI agent pauses and requires human approval/permission (terminal command, sandbox bypass, file edit).
+  - `heyhuman.notifyOn.codeFinish` (default `true`): Trigger alert when an AI agent finishes generating code or completes its task.
+  - `heyhuman.notifyOn.questionInput` (default `true`): Trigger alert when an agent asks a question or questionnaire (`ask_question`).
+  - `heyhuman.notifyOn.taskError` (default `true`): Trigger alert when an agent encounters an execution failure or command error.
+  - `heyhuman.notifyOn.subagentMilestone` (default `false`): Trigger alert when a background subagent finishes execution.
+  - `heyhuman.notifyOn.contextLimitWarning` (default `false`): Trigger alert when an agent nears context length or quota limits.
+- **Interactive Checkbox QuickPick Dialog**: Added `HeyHuman: Configure Notification Triggers...` (`heyhuman.configureNotificationTriggers`) command in the Command Palette and Status Bar Quick Menu (`$(checklist) Notification Triggers...`) with multi-select checkboxes.
+- **Intelligent Audio Adaptability**: Automatically plays a harmonic chime on code completion instead of a harsh emergency siren.
+- **Agent Code Finish Detection**: Emits `code_finish` lifecycle events across Google Antigravity, Claude Code, and Aider.
+
 ## [1.2.7] - 2026-10-13
 
 ### Added

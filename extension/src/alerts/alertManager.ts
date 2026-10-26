@@ -38,6 +38,10 @@ export class AlertManager {
       return false;
     }
 
+    if (!this.settings.isNotificationTriggerEnabled(event.type)) {
+      return false;
+    }
+
     if (this.settings.isMuted()) {
       return false;
     }
@@ -52,7 +56,10 @@ export class AlertManager {
 
     // 5. Play audio if sound enabled
     if (this.settings.isSoundEnabled()) {
-      const soundType = this.settings.getSoundType();
+      let soundType = this.settings.getSoundType();
+      if (event.type === 'code_finish' && (soundType === 'siren' || soundType === 'alarm')) {
+        soundType = 'chime';
+      }
       const volume = this.settings.getSoundVolume();
       const customPath = this.settings.getCustomSoundPath();
       this.audioPlayer.playSound(soundType, volume, customPath).catch((err) => {

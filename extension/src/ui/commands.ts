@@ -98,6 +98,14 @@ export function registerCommands(
         `• Notifications: ${settings.isNotificationsEnabled() ? 'Enabled' : 'Disabled'}`,
         `• Alert Cooldown: ${settings.getCooldownSeconds()}s`,
         '',
+        'Notification Triggers (When to notify):',
+        `• On Permission Needed: ${settings.isNotifyOnPermissionNeeded() ? 'Yes' : 'No'}`,
+        `• On Code Finish: ${settings.isNotifyOnCodeFinish() ? 'Yes' : 'No'}`,
+        `• On Questions / Input: ${settings.isNotifyOnQuestionInput() ? 'Yes' : 'No'}`,
+        `• On Task Errors: ${settings.isNotifyOnTaskError() ? 'Yes' : 'No'}`,
+        `• On Subagent Milestones: ${settings.isNotifyOnSubagentMilestone() ? 'Yes' : 'No'}`,
+        `• On Context / Rate Limits: ${settings.isNotifyOnContextLimitWarning() ? 'Yes' : 'No'}`,
+        '',
         'Agent Detectors:'
       ];
 
@@ -146,7 +154,7 @@ export function registerCommands(
     })
   );
 
-  // 10. Enable Antigravity Mobile Approval Hook
+  // 11. Enable Antigravity Mobile Approval Hook
   context.subscriptions.push(
     vscode.commands.registerCommand('heyhuman.setupAntigravityHook', async () => {
       const ag = detectors.find(d => d.id === 'antigravity') as AntigravityDetector | undefined;
@@ -158,7 +166,73 @@ export function registerCommands(
     })
   );
 
-  // 11. Status Bar Quick Menu
+  // 12. Configure Notification Triggers Checkboxes
+  context.subscriptions.push(
+    vscode.commands.registerCommand('heyhuman.configureNotificationTriggers', async () => {
+      interface TriggerItem extends vscode.QuickPickItem {
+        key: 'permissionNeeded' | 'codeFinish' | 'questionInput' | 'taskError' | 'subagentMilestone' | 'contextLimitWarning';
+      }
+
+      const items: TriggerItem[] = [
+        {
+          key: 'permissionNeeded',
+          label: 'User Permission Needed',
+          description: 'Terminal commands, sandbox bypass, file edits requiring approval',
+          picked: settings.isNotifyOnPermissionNeeded()
+        },
+        {
+          key: 'codeFinish',
+          label: 'Code Finish / Task Complete',
+          description: 'Agent finishes writing code or completes its response',
+          picked: settings.isNotifyOnCodeFinish()
+        },
+        {
+          key: 'questionInput',
+          label: 'Interactive Questions & Inputs',
+          description: 'Agent asks clarifying questions or multi-choice questionnaire',
+          picked: settings.isNotifyOnQuestionInput()
+        },
+        {
+          key: 'taskError',
+          label: 'Tool & Command Errors',
+          description: 'Agent encounters execution errors, broken tests, or exceptions',
+          picked: settings.isNotifyOnTaskError()
+        },
+        {
+          key: 'subagentMilestone',
+          label: 'Subagent Milestones',
+          description: 'Background subagent completes delegated task',
+          picked: settings.isNotifyOnSubagentMilestone()
+        },
+        {
+          key: 'contextLimitWarning',
+          label: 'Context & Rate Limit Warnings',
+          description: 'Approaching token limits or model rate quotas',
+          picked: settings.isNotifyOnContextLimitWarning()
+        }
+      ];
+
+      const chosen = await vscode.window.showQuickPick(items, {
+        canPickMany: true,
+        title: 'HeyHuman: When Should It Notify? (Select Checkboxes)',
+        placeHolder: 'Select all event types that should trigger alerts'
+      });
+
+      if (chosen !== undefined) {
+        const chosenKeys = new Set(chosen.map(c => c.key));
+        await settings.setNotifyOnPermissionNeeded(chosenKeys.has('permissionNeeded'));
+        await settings.setNotifyOnCodeFinish(chosenKeys.has('codeFinish'));
+        await settings.setNotifyOnQuestionInput(chosenKeys.has('questionInput'));
+        await settings.setNotifyOnTaskError(chosenKeys.has('taskError'));
+        await settings.setNotifyOnSubagentMilestone(chosenKeys.has('subagentMilestone'));
+        await settings.setNotifyOnContextLimitWarning(chosenKeys.has('contextLimitWarning'));
+
+        vscode.window.showInformationMessage('🔔 HeyHuman notification trigger checkboxes updated.');
+      }
+    })
+  );
+
+  // 13. Status Bar Quick Menu
   context.subscriptions.push(
     vscode.commands.registerCommand('heyhuman.showQuickMenu', async () => {
       const isEnabled = settings.isEnabled();
@@ -172,6 +246,10 @@ export function registerCommands(
         {
           label: isMuted ? '$(bell) Unmute Alerts' : '$(bell-slash) Mute Temporarily...',
           description: isMuted ? `Currently muted (${settings.getMuteRemainingMinutes()}m remaining)` : 'Silence alerts temporarily'
+        },
+        {
+          label: '$(checklist) Notification Triggers...',
+          description: 'Configure checkboxes for when HeyHuman alerts (code finish, permission, errors)'
         },
         {
           label: '$(play) Test Sound',
@@ -213,6 +291,8 @@ export function registerCommands(
         await vscode.commands.executeCommand('heyhuman.disableAlerts');
       } else if (selection.label.includes('Enable Alerts')) {
         await vscode.commands.executeCommand('heyhuman.enableAlerts');
+      } else if (selection.label.includes('Notification Triggers')) {
+        await vscode.commands.executeCommand('heyhuman.configureNotificationTriggers');
       } else if (selection.label.includes('Disable Phone Alerts') || selection.label.includes('Enable Phone Alerts')) {
         await vscode.commands.executeCommand('heyhuman.togglePhoneAlerts');
       } else if (selection.label.includes('Unmute Alerts')) {

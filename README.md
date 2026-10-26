@@ -100,9 +100,18 @@ Customize your experience in VS Code Settings (`Cmd+,` / `Ctrl+,`) or in `settin
   // Master toggle for all HeyHuman alerts
   "heyhuman.enabled": true,
 
+  // Notification Triggers (When to notify - Checkboxes in Settings UI)
+  "heyhuman.notifyOn.permissionNeeded": true,     // When agent pauses for human permission/approval
+  "heyhuman.notifyOn.codeFinish": true,           // When agent finishes writing code / completes task
+  "heyhuman.notifyOn.questionInput": true,        // When agent asks questions / questionnaires
+  "heyhuman.notifyOn.taskError": true,            // When agent encounters command/tool execution errors
+  "heyhuman.notifyOn.subagentMilestone": false,   // When background subagents finish delegated work
+  "heyhuman.notifyOn.contextLimitWarning": false, // When agent nears token context or rate limits
+
   // Web Relay & Remote Room
   "heyhuman.webEndpoint": "https://hey-human-akdey.vercel.app",
   "heyhuman.webRoom": "your-room-id",
+  "heyhuman.phoneAlerts.enabled": false,
 
   // Agent-specific controls
   "heyhuman.agents.antigravity.enabled": true,
@@ -126,6 +135,8 @@ Customize your experience in VS Code Settings (`Cmd+,` / `Ctrl+,`) or in `settin
   "heyhuman.alerts.temporaryMuteDurationMinutes": 15
 }
 ```
+
+> **Tip:** You can toggle these triggers anytime via checkboxes in VS Code Settings (`heyhuman.notifyOn`), from the Command Palette (`HeyHuman: Configure Notification Triggers...`), or by clicking the HeyHuman status bar icon!
 
 ---
 
@@ -193,20 +204,33 @@ flowchart TD
 
 ## 🚀 Future Roadmap
 
-### 1. Interactive Remote Question Answering
+### 1. Intelligent Notification Triggers & Sound Profiles
+- [ ] **Distinct Sound Themes per Trigger Event**: Assign custom sounds per event (gentle harmonic chimes for code completion, urgent emergency sirens for permission blocks, subtle pings on subagent handoffs, alert buzzers for command/test failures).
+- [ ] **Automated Test & Build Failure Detection**: Proactively parse terminal outputs and exit codes (`npm test`, `pytest`, `cargo test`) to alert when an agent's code change causes test suite or build regressions.
+- [ ] **Long-Running Task Milestones & Inactivity Ping**: Audio reminder if an autonomous agent task runs uninterrupted for > 5 minutes or becomes stalled.
+- [ ] **Context Window & Rate Limit Threshold Warnings**: Audio alert when conversation context reaches 85%+ or model rate limits approach before execution halts.
+- [ ] **Focus Suppression ("Suppress If Focused")**: Automatically skip alarms if the editor window is already actively focused and the user is typing, only sounding alerts when the window is in the background.
+- [ ] **Quiet Hours & Scheduled Do Not Disturb**: Schedule daily quiet periods (e.g. 10 PM - 8 AM) with automatic volume reduction or haptics-only mobile alerts.
+- [ ] **Granular Agent Triggers**: Fine-tune triggers per agent (e.g. notify on both permissions and code finish for Antigravity, but only permissions for Copilot).
+
+### 2. Interactive Remote Question Answering & Mobile Controls
 - [ ] **Mobile Questionnaire Bridge**: Render Antigravity `ask_question` option choices directly on mobile, allowing you to select options (A, B, C) or type clarification replies from your phone.
+- [ ] **Mobile Git Diff & File Inspection**: Review changed files, syntax diffs, and command blast radius on your smartphone before tapping Approve.
+- [ ] **Voice-to-Text Dictation**: Dictate question responses and custom prompts into your phone microphone and stream them straight to the agent prompt.
 - [ ] **Companion Daemon Injection**: Deep OS/IPC hook to auto-dismiss native sandbox bypass confirmations on verified mobile approval.
 
-### 2. Multi-Device & Native Push Notifications
+### 3. Multi-Device & Native Push Notifications
 - [ ] **Web Push API (Apple APNs & FCM)**: Receive persistent lock-screen push notifications even when the browser tab is closed.
 - [ ] **Apple Watch & Wear OS Complications**: Haptic pulse and prompt inspection directly on smartwatches.
-- [ ] **Discord & Slack Webhooks**: Relay alerts to private developer team channels when long-running agent workflows hit gates.
+- [ ] **Discord & Slack Webhooks**: Relay alerts to private developer team channels when long-running agent workflows hit gates or finish jobs.
+- [ ] **Critical Alert Bypass for iOS**: High-priority push notifications that can break through iOS Focus / Do Not Disturb modes for urgent blocking permissions.
 
-### 3. Voice & Speech Synthesis Intelligence
+### 4. Voice & Speech Synthesis Intelligence
 - [ ] **Spoken Action Prompts**: Custom spoken descriptions: *"Hey human! Antigravity needs permission to run git push"*.
 - [ ] **Custom Voice Packs**: Choose between different voices (Jarvis, Retro Sci-Fi, Minimalist).
 
-### 4. Standalone System Tray Companion
+### 5. Multi-Agent Team Orchestration & Standalone Companion
+- [ ] **Subagent Dependency Graph**: Live visualization and notifications for subagent handoffs (`invoke_subagent`), showing active subagent states and progress.
 - [ ] **Menu Bar / System Tray App**: Lightweight background tray app for macOS, Windows, and Linux that monitors agents across all workspaces without requiring VS Code to remain open.
 
 ---

@@ -11,6 +11,10 @@ export type PermissionType =
   | 'confirmation_dialog' 
   | 'file_access' 
   | 'question_input'
+  | 'code_finish'
+  | 'task_error'
+  | 'subagent_milestone'
+  | 'context_limit'
   | 'other';
 
 export type PermissionState = 

@@ -277,4 +277,87 @@ describe('AlertManager', () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it('triggers alert and uses chime for code_finish when notifyOn.codeFinish is true', async () => {
+    await settings.setNotifyOnCodeFinish(true);
+
+    const event: PermissionEvent = {
+      id: 'finish-test-1',
+      agent: 'antigravity',
+      type: 'code_finish',
+      state: 'pending',
+      summary: 'Task completed successfully',
+      timestamp: Date.now()
+    };
+
+    const triggered = await alertManager.triggerAlert(event);
+    assert.strictEqual(triggered, true);
+    assert.strictEqual(mockAudio.playCount, 1);
+    assert.strictEqual(mockAudio.lastSoundType, 'chime');
+    assert.strictEqual(mockNotification.notifyCount, 1);
+  });
+
+  it('suppresses alert on code_finish when notifyOn.codeFinish is false', async () => {
+    await settings.setNotifyOnCodeFinish(false);
+
+    const event: PermissionEvent = {
+      id: 'finish-test-2',
+      agent: 'antigravity',
+      type: 'code_finish',
+      state: 'pending',
+      summary: 'Task completed',
+      timestamp: Date.now()
+    };
+
+    const triggered = await alertManager.triggerAlert(event);
+    assert.strictEqual(triggered, false);
+    assert.strictEqual(mockAudio.playCount, 0);
+    assert.strictEqual(mockNotification.notifyCount, 0);
+  });
+
+  it('suppresses alert on permission request when notifyOn.permissionNeeded is false', async () => {
+    await settings.setNotifyOnPermissionNeeded(false);
+
+    const event: PermissionEvent = {
+      id: 'perm-test-1',
+      agent: 'antigravity',
+      type: 'terminal_command',
+      state: 'pending',
+      summary: 'Run bash command',
+      timestamp: Date.now()
+    };
+
+    const triggered = await alertManager.triggerAlert(event);
+    assert.strictEqual(triggered, false);
+    assert.strictEqual(mockAudio.playCount, 0);
+  });
+
+  it('triggers alert on task_error when notifyOn.taskError is true and suppresses when false', async () => {
+    await settings.setNotifyOnTaskError(true);
+
+    const event: PermissionEvent = {
+      id: 'err-test-1',
+      agent: 'antigravity',
+      type: 'task_error',
+      state: 'pending',
+      summary: 'Tool execution failed',
+      timestamp: Date.now()
+    };
+
+    const triggered = await alertManager.triggerAlert(event);
+    assert.strictEqual(triggered, true);
+    assert.strictEqual(mockNotification.notifyCount, 1);
+
+    await settings.setNotifyOnTaskError(false);
+    const event2: PermissionEvent = {
+      id: 'err-test-2',
+      agent: 'antigravity',
+      type: 'task_error',
+      state: 'pending',
+      summary: 'Tool execution failed again',
+      timestamp: Date.now() + 10000
+    };
+    const triggered2 = await alertManager.triggerAlert(event2);
+    assert.strictEqual(triggered2, false);
+  });
 });

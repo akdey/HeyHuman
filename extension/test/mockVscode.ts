@@ -17,7 +17,13 @@ const configStore: Record<string, any> = {
   'heyhuman.antigravity.customLogPath': '',
   'heyhuman.antigravity.companionPort': 47291,
   'heyhuman.copilot.customLogPath': '',
-  'heyhuman.phoneAlerts.enabled': false
+  'heyhuman.phoneAlerts.enabled': false,
+  'heyhuman.notifyOn.permissionNeeded': true,
+  'heyhuman.notifyOn.codeFinish': true,
+  'heyhuman.notifyOn.questionInput': true,
+  'heyhuman.notifyOn.taskError': true,
+  'heyhuman.notifyOn.subagentMilestone': false,
+  'heyhuman.notifyOn.contextLimitWarning': false
 };
 
 class EventEmitter<T> {

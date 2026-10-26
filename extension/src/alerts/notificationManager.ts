@@ -33,21 +33,58 @@ export class NotificationManager {
               : 'AI Agent';
 
     const shortSummary = event.summary ? `: ${event.summary}` : '';
-    const message = `🚨 HeyHuman! ${agentTitle} needs your permission${shortSummary}`;
+    let message = `🚨 HeyHuman! ${agentTitle} needs your permission${shortSummary}`;
+    let isInfo = false;
+    let isError = false;
+
+    if (event.type === 'code_finish') {
+      message = `🎉 HeyHuman! ${agentTitle} finished coding${shortSummary}`;
+      isInfo = true;
+    } else if (event.type === 'task_error') {
+      message = `⚠️ HeyHuman! ${agentTitle} encountered an error${shortSummary}`;
+      isError = true;
+    } else if (event.type === 'question_input') {
+      message = `💬 HeyHuman! ${agentTitle} has a question for you${shortSummary}`;
+    } else if (event.type === 'subagent_milestone') {
+      message = `🚀 HeyHuman! ${agentTitle} subagent milestone completed${shortSummary}`;
+      isInfo = true;
+    } else if (event.type === 'context_limit') {
+      message = `⏳ HeyHuman! ${agentTitle} approaching context/rate limits${shortSummary}`;
+    }
+
     const muteOption = `Mute (${this.settings.getTemporaryMuteDurationMinutes()}m)`;
     
     const focusOption = event.type === 'terminal_command' 
       ? 'Review in Terminal' 
-      : 'Review in Chat';
+      : event.type === 'code_finish'
+        ? 'View Output'
+        : 'Review in Chat';
     const altOption = 'Focus Window';
 
     try {
-      const selected = await vscode.window.showWarningMessage(
-        message,
-        focusOption,
-        altOption,
-        muteOption
-      );
+      let selected: string | undefined;
+      if (isInfo) {
+        selected = await vscode.window.showInformationMessage(
+          message,
+          focusOption,
+          altOption,
+          muteOption
+        );
+      } else if (isError) {
+        selected = await vscode.window.showErrorMessage(
+          message,
+          focusOption,
+          altOption,
+          muteOption
+        );
+      } else {
+        selected = await vscode.window.showWarningMessage(
+          message,
+          focusOption,
+          altOption,
+          muteOption
+        );
+      }
 
       if (selected === focusOption || selected === altOption) {
         if (this.settings.getFocusWindowOnClick()) {

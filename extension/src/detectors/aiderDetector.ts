@@ -244,6 +244,21 @@ export class AiderDetector implements IAgentDetector {
         this.permissionDetectedEmitter.fire(event);
       } else if (isResolution) {
         this.resolveAllPending();
+        if (/applied\s+(changes|edit)/i.test(line)) {
+          this.eventSequence++;
+          const idHash = crypto.createHash('sha256').update(`${sourcePath}:${line}:${this.eventSequence}`).digest('hex').slice(0, 12);
+          const finishEvent: PermissionEvent = {
+            id: `aider-finish-${idHash}`,
+            agent: 'aider',
+            type: 'code_finish',
+            state: 'pending',
+            summary: 'Aider applied code changes',
+            details: line,
+            timestamp: Date.now(),
+            metadata: { sourcePath }
+          };
+          this.permissionDetectedEmitter.fire(finishEvent);
+        }
       }
     }
   }

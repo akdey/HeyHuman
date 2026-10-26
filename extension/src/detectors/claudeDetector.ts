@@ -254,6 +254,22 @@ export class ClaudeDetector implements IAgentDetector {
         this.permissionDetectedEmitter.fire(event);
       } else if (isResolution) {
         this.resolveAllPending();
+        const isTaskFinish = /task\s+(completed|finished)|done\s+in\s+[\d.]+[smh]?/i.test(line);
+        if (isTaskFinish) {
+          this.eventSequence++;
+          const idHash = crypto.createHash('sha256').update(`${sourcePath}:${line}:${this.eventSequence}`).digest('hex').slice(0, 12);
+          const finishEvent: PermissionEvent = {
+            id: `claude-finish-${idHash}`,
+            agent: 'claude',
+            type: 'code_finish',
+            state: 'pending',
+            summary: 'Claude Code completed task',
+            details: line,
+            timestamp: Date.now(),
+            metadata: { sourcePath }
+          };
+          this.permissionDetectedEmitter.fire(finishEvent);
+        }
       }
     }
   }

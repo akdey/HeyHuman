@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { AgentType } from '../events/permissionEvent';
+import { AgentType, PermissionType } from '../events/permissionEvent';
 
 export type SoundType = 'siren' | 'alarm' | 'chime' | 'beep';
 
@@ -133,6 +133,75 @@ export class SettingsManager {
 
   public getAiderCustomLogPath(): string {
     return this.getConfig().get<string>('aider.customLogPath', '').trim();
+  }
+
+  // Notification Triggers (When to notify - Checkboxes in Settings UI)
+  public isNotifyOnPermissionNeeded(): boolean {
+    return this.getConfig().get<boolean>('notifyOn.permissionNeeded', true);
+  }
+
+  public async setNotifyOnPermissionNeeded(value: boolean): Promise<void> {
+    await this.getConfig().update('notifyOn.permissionNeeded', value, vscode.ConfigurationTarget.Global);
+  }
+
+  public isNotifyOnCodeFinish(): boolean {
+    return this.getConfig().get<boolean>('notifyOn.codeFinish', true);
+  }
+
+  public async setNotifyOnCodeFinish(value: boolean): Promise<void> {
+    await this.getConfig().update('notifyOn.codeFinish', value, vscode.ConfigurationTarget.Global);
+  }
+
+  public isNotifyOnQuestionInput(): boolean {
+    return this.getConfig().get<boolean>('notifyOn.questionInput', true);
+  }
+
+  public async setNotifyOnQuestionInput(value: boolean): Promise<void> {
+    await this.getConfig().update('notifyOn.questionInput', value, vscode.ConfigurationTarget.Global);
+  }
+
+  public isNotifyOnTaskError(): boolean {
+    return this.getConfig().get<boolean>('notifyOn.taskError', true);
+  }
+
+  public async setNotifyOnTaskError(value: boolean): Promise<void> {
+    await this.getConfig().update('notifyOn.taskError', value, vscode.ConfigurationTarget.Global);
+  }
+
+  public isNotifyOnSubagentMilestone(): boolean {
+    return this.getConfig().get<boolean>('notifyOn.subagentMilestone', false);
+  }
+
+  public async setNotifyOnSubagentMilestone(value: boolean): Promise<void> {
+    await this.getConfig().update('notifyOn.subagentMilestone', value, vscode.ConfigurationTarget.Global);
+  }
+
+  public isNotifyOnContextLimitWarning(): boolean {
+    return this.getConfig().get<boolean>('notifyOn.contextLimitWarning', false);
+  }
+
+  public async setNotifyOnContextLimitWarning(value: boolean): Promise<void> {
+    await this.getConfig().update('notifyOn.contextLimitWarning', value, vscode.ConfigurationTarget.Global);
+  }
+
+  public isNotificationTriggerEnabled(type: PermissionType): boolean {
+    if (type === 'code_finish') {
+      return this.isNotifyOnCodeFinish();
+    }
+    if (type === 'task_error') {
+      return this.isNotifyOnTaskError();
+    }
+    if (type === 'question_input') {
+      return this.isNotifyOnQuestionInput();
+    }
+    if (type === 'subagent_milestone') {
+      return this.isNotifyOnSubagentMilestone();
+    }
+    if (type === 'context_limit') {
+      return this.isNotifyOnContextLimitWarning();
+    }
+    // All other permission types (terminal_command, tool_execution, confirmation_dialog, file_access, other)
+    return this.isNotifyOnPermissionNeeded();
   }
 
   // Webhook / Web App Room & Mobile Phone Sync

@@ -587,6 +587,40 @@ export class AntigravityDetector implements IAgentDetector {
     if (step.source === 'USER_EXPLICIT' || step.source === 'USER_INPUT' || stepStatus === 'DONE') {
       this.resolveAllPending();
     }
+
+    // 5. Code finish check: If PLANNER_RESPONSE completed without pending tool calls
+    if (step.type === 'PLANNER_RESPONSE' && stepStatus === 'DONE' && toolCalls.length === 0) {
+      const id = `ag-step-${stepIndex}-finish`;
+      const event: PermissionEvent = {
+        id,
+        agent: 'antigravity',
+        type: 'code_finish',
+        state: 'pending',
+        summary: 'Antigravity completed task & finished response',
+        details: typeof step.content === 'string' ? step.content.slice(0, 150) : '',
+        timestamp: Date.now(),
+        metadata: { stepIndex, sourcePath }
+      };
+      this.permissionDetectedEmitter.fire(event);
+      return;
+    }
+
+    // 6. Error check: If step ended with error
+    if (stepStatus === 'ERROR' || step.status === 'ERROR') {
+      const id = `ag-step-${stepIndex}-error`;
+      const event: PermissionEvent = {
+        id,
+        agent: 'antigravity',
+        type: 'task_error',
+        state: 'pending',
+        summary: 'Antigravity encountered a step execution error',
+        details: typeof step.content === 'string' ? step.content.slice(0, 150) : '',
+        timestamp: Date.now(),
+        metadata: { stepIndex, sourcePath }
+      };
+      this.permissionDetectedEmitter.fire(event);
+      return;
+    }
   }
 
   private resolveAllPending(): void {
