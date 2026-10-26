@@ -2,6 +2,11 @@
 
 All notable changes to the "heyhuman" extension will be documented in this file.
 
+## [1.3.1] - 2026-10-26
+
+### Fixed
+- **Resilient Configuration Persistence**: Resolved `"Unable to write to User Settings because heyhuman.phoneAlerts.enabled is not a registered configuration"` error. Added multi-tier fallback that updates Global settings, falls back to Workspace settings, or writes directly to `.vscode/settings.json` if the host IDE process is running an older schema cache before a window reload.
+
 ## [1.3.0] - 2026-10-26
 
 ### Added
