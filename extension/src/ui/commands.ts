@@ -145,12 +145,17 @@ export function registerCommands(
   // 10. Toggle Phone Notifications
   context.subscriptions.push(
     vscode.commands.registerCommand('heyhuman.togglePhoneAlerts', async () => {
-      const current = settings.isPhoneAlertsEnabled();
-      await settings.setPhoneAlertsEnabled(!current);
-      const msg = !current
-        ? `📱 HeyHuman phone notifications enabled (Room: ${settings.getWebRoom() || 'default'}).`
-        : '📱 HeyHuman phone notifications disabled (Zero API calls).';
-      vscode.window.showInformationMessage(msg);
+      try {
+        const current = settings.isPhoneAlertsEnabled();
+        await settings.setPhoneAlertsEnabled(!current);
+        const active = settings.isPhoneAlertsEnabled();
+        const msg = active
+          ? `📱 HeyHuman phone notifications enabled (Room: ${settings.getWebRoom() || 'default'}).`
+          : '📱 HeyHuman phone notifications disabled (Zero API calls).';
+        vscode.window.showInformationMessage(msg);
+      } catch (err: any) {
+        vscode.window.showWarningMessage(`HeyHuman: Could not persist setting to user profile (${err?.message || err}). Workspace override has been set.`);
+      }
     })
   );
 

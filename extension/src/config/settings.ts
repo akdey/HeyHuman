@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { AgentType, PermissionType } from '../events/permissionEvent';
 
 export type SoundType = 'siren' | 'alarm' | 'chime' | 'beep';
@@ -6,6 +8,7 @@ export type SoundType = 'siren' | 'alarm' | 'chime' | 'beep';
 export class SettingsManager {
   private static instance: SettingsManager;
   private mutedUntil: Date | null = null;
+  private phoneAlertsOverride: boolean | null = null;
   private readonly onDidChangeSettingsEmitter = new vscode.EventEmitter<void>();
   public readonly onDidChangeSettings = this.onDidChangeSettingsEmitter.event;
 
@@ -141,7 +144,7 @@ export class SettingsManager {
   }
 
   public async setNotifyOnPermissionNeeded(value: boolean): Promise<void> {
-    await this.getConfig().update('notifyOn.permissionNeeded', value, vscode.ConfigurationTarget.Global);
+    await this.safeUpdate('notifyOn.permissionNeeded', value);
   }
 
   public isNotifyOnCodeFinish(): boolean {
@@ -149,7 +152,7 @@ export class SettingsManager {
   }
 
   public async setNotifyOnCodeFinish(value: boolean): Promise<void> {
-    await this.getConfig().update('notifyOn.codeFinish', value, vscode.ConfigurationTarget.Global);
+    await this.safeUpdate('notifyOn.codeFinish', value);
   }
 
   public isNotifyOnQuestionInput(): boolean {
@@ -157,7 +160,7 @@ export class SettingsManager {
   }
 
   public async setNotifyOnQuestionInput(value: boolean): Promise<void> {
-    await this.getConfig().update('notifyOn.questionInput', value, vscode.ConfigurationTarget.Global);
+    await this.safeUpdate('notifyOn.questionInput', value);
   }
 
   public isNotifyOnTaskError(): boolean {
@@ -165,7 +168,7 @@ export class SettingsManager {
   }
 
   public async setNotifyOnTaskError(value: boolean): Promise<void> {
-    await this.getConfig().update('notifyOn.taskError', value, vscode.ConfigurationTarget.Global);
+    await this.safeUpdate('notifyOn.taskError', value);
   }
 
   public isNotifyOnSubagentMilestone(): boolean {
@@ -173,7 +176,7 @@ export class SettingsManager {
   }
 
   public async setNotifyOnSubagentMilestone(value: boolean): Promise<void> {
-    await this.getConfig().update('notifyOn.subagentMilestone', value, vscode.ConfigurationTarget.Global);
+    await this.safeUpdate('notifyOn.subagentMilestone', value);
   }
 
   public isNotifyOnContextLimitWarning(): boolean {
@@ -181,7 +184,7 @@ export class SettingsManager {
   }
 
   public async setNotifyOnContextLimitWarning(value: boolean): Promise<void> {
-    await this.getConfig().update('notifyOn.contextLimitWarning', value, vscode.ConfigurationTarget.Global);
+    await this.safeUpdate('notifyOn.contextLimitWarning', value);
   }
 
   public isNotificationTriggerEnabled(type: PermissionType): boolean {
@@ -209,11 +212,55 @@ export class SettingsManager {
     if (!this.isEnabled()) {
       return false;
     }
+    if (this.phoneAlertsOverride !== null) {
+      return this.phoneAlertsOverride;
+    }
     return this.getConfig().get<boolean>('phoneAlerts.enabled', false);
   }
 
   public async setPhoneAlertsEnabled(value: boolean): Promise<void> {
-    await this.getConfig().update('phoneAlerts.enabled', value, vscode.ConfigurationTarget.Global);
+    this.phoneAlertsOverride = value;
+    this.onDidChangeSettingsEmitter.fire();
+    await this.safeUpdate('phoneAlerts.enabled', value);
+  }
+
+  /**
+   * Resilient config updater: updates Global settings, falls back to Workspace target,
+   * or writes directly to .vscode/settings.json if schema is not yet registered in running host.
+   */
+  private async safeUpdate(section: string, value: any): Promise<void> {
+    try {
+      await this.getConfig().update(section, value, vscode.ConfigurationTarget.Global);
+    } catch (err) {
+      try {
+        await this.getConfig().update(section, value, vscode.ConfigurationTarget.Workspace);
+      } catch (wsErr) {
+        this.writeFallbackWorkspaceSetting(`heyhuman.${section}`, value);
+      }
+    }
+  }
+
+  private writeFallbackWorkspaceSetting(key: string, value: any): void {
+    try {
+      const folders = vscode.workspace.workspaceFolders;
+      if (!folders || folders.length === 0) return;
+      const rootPath = folders[0].uri.fsPath;
+      const vscodeDir = path.join(rootPath, '.vscode');
+      const settingsFile = path.join(vscodeDir, 'settings.json');
+      if (!fs.existsSync(vscodeDir)) {
+        fs.mkdirSync(vscodeDir, { recursive: true });
+      }
+      let existing: Record<string, any> = {};
+      if (fs.existsSync(settingsFile)) {
+        try {
+          existing = JSON.parse(fs.readFileSync(settingsFile, 'utf-8'));
+        } catch {}
+      }
+      existing[key] = value;
+      fs.writeFileSync(settingsFile, JSON.stringify(existing, null, 2), 'utf-8');
+    } catch (e) {
+      console.warn('[HeyHuman] Failed to write fallback workspace setting:', e);
+    }
   }
 
   public getWebRoom(): string {
@@ -221,7 +268,7 @@ export class SettingsManager {
   }
 
   public async setWebRoom(room: string): Promise<void> {
-    await this.getConfig().update('webRoom', room.trim(), vscode.ConfigurationTarget.Global);
+    await this.safeUpdate('webRoom', room.trim());
   }
 
   public getWebEndpoint(): string {
