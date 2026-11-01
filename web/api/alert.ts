@@ -86,8 +86,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
         await webpush.sendNotification(newSub, welcomePayload);
         welcomeSuccess = true;
-      } catch (err: any) {
-        welcomeError = err?.message || String(err);
+      } catch (err: unknown) {
+        welcomeError = err instanceof Error ? err.message : String(err);
         console.error('[HeyHuman] Push test error:', err);
       }
 

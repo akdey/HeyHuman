@@ -1,17 +1,47 @@
 :root {
+  /* Surface & Background Neutrals */
   --bg: #090a0f;
-  --surface: #12141c;
-  --surface-raised: #181b26;
+  --bg-gradient: radial-gradient(circle at 50% 0%, rgba(30, 41, 59, 0.25) 0%, rgba(9, 10, 15, 1) 75%);
+  --surface: #11131a;
+  --surface-translucent: rgba(17, 19, 26, 0.78);
+  --surface-raised: #171a24;
+  --surface-elevated: #1e2230;
+  --surface-sunken: #0c0d12;
+  
+  /* Hairline Borders */
   --border: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.05);
   --border-active: rgba(255, 255, 255, 0.16);
-  --text-1: #ffffff;
-  --text-2: #9499ad;
-  --text-3: #585d73;
-  --accent-red: #ff3b30;
-  --accent-green: #34c759;
+  --border-focus: rgba(0, 113, 227, 0.5);
+
+  /* Typography Colors */
+  --text-1: #f8fafc;
+  --text-2: #94a3b8;
+  --text-3: #64748b;
+  --text-inverse: #090a0f;
+
+  /* Semantic Accents (Restrained Apple & System Tones) */
   --accent-blue: #0071e3;
+  --accent-blue-hover: #0077ed;
+  --accent-blue-tint: rgba(0, 113, 227, 0.12);
+  --accent-green: #30d158;
+  --accent-green-tint: rgba(48, 209, 88, 0.12);
+  --accent-red: #ff453a;
+  --accent-red-tint: rgba(255, 69, 58, 0.12);
+  --accent-amber: #ff9f0a;
+  --accent-amber-tint: rgba(255, 159, 10, 0.12);
+  --accent-purple: #bf5af2;
+  --accent-purple-tint: rgba(191, 90, 242, 0.12);
+
+  /* Fonts */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, sans-serif;
-  --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --font-mono: "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 32px -8px rgba(0, 0, 0, 0.7);
+  --shadow-xl: 0 24px 60px -12px rgba(0, 0, 0, 0.85);
 }
 
 * {
@@ -23,6 +53,8 @@
 
 html, body {
   background-color: var(--bg);
+  background-image: var(--bg-gradient);
+  background-attachment: fixed;
   color: var(--text-1);
   font-family: var(--font-sans);
   min-height: 100vh;
@@ -36,28 +68,34 @@ body {
   flex-direction: column;
 }
 
-/* Subtle Apple-style tactile interaction */
-button, input {
+/* Subtle tactile feedback on press */
+button, input, select, textarea {
   font-family: inherit;
 }
 
 button:active {
-  transform: scale(0.97);
-  transition: transform 80ms ease-out;
+  transform: scale(0.98);
+  transition: transform 60ms ease-out;
 }
 
-/* Single glowing radar pulse when waiting for AI */
+/* Focus outlines with accessible contrast */
+button:focus-visible, input:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+/* Radar pulse animation for calm monitoring state */
 @keyframes radarPulse {
   0% {
-    transform: scale(0.95);
+    transform: scale(0.96);
     opacity: 0.8;
   }
   50% {
     transform: scale(1.08);
-    opacity: 0.3;
+    opacity: 0.25;
   }
   100% {
-    transform: scale(0.95);
+    transform: scale(0.96);
     opacity: 0.8;
   }
 }
@@ -66,18 +104,27 @@ button:active {
   animation: radarPulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Emergency state: when agent is waiting */
-@keyframes alarmBeacon {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.4);
-    border-color: rgba(255, 59, 48, 0.6);
-  }
-  50% {
-    box-shadow: 0 0 40px 10px rgba(255, 59, 48, 0.35);
-    border-color: rgba(255, 59, 48, 1);
-  }
+/* Clean scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
-.alarm-active {
-  animation: alarmBeacon 1.2s infinite ease-in-out;
+/* Accessibility: Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
