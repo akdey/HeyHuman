@@ -16,11 +16,8 @@ import {
   Terminal,
   ArrowUpRight,
   Sparkles,
-  Sliders,
   Radio,
   Laptop,
-  Smartphone,
-  Cpu,
   Code2
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -115,7 +112,7 @@ export function App() {
   const [copiedSnippetKey, setCopiedSnippetKey] = useState<string | null>(null);
 
   // Navigation states
-  const [mobileTab, setMobileTab] = useState<'monitor' | 'tools' | 'activity'>('monitor');
+  const [mobileTab, setMobileTab] = useState<'monitor' | 'tools'>('monitor');
   const [selectedTool, setSelectedTool] = useState<VibeToolId>('antigravity');
 
   const lastSeenIdRef = useRef<string | null>(null);
@@ -403,6 +400,7 @@ export function App() {
     setPrevAlertId(pendingAlert.id);
     setSelectedOptionIndex(1);
     setCustomInputText('');
+    setMobileTab('monitor');
   }
 
   const handleSubmitAntigravity = () => {
@@ -596,21 +594,24 @@ export function App() {
       
       {/* 1. Header Navigation */}
       <header className="app-header">
-        <div className="brand-section">
-          <img src="/logo.svg" alt="HeyHuman" className="brand-logo" />
-          <div className="brand-text-wrap">
-            <span className="brand-title">
-              HeyHuman <Sparkles size={13} style={{ color: 'var(--accent-amber)' }} />
-            </span>
-            <span className="brand-tag">Vibe Coding Alert Station</span>
+        <div className="header-top-row">
+          <div className="brand-section">
+            <img src="/logo.svg" alt="HeyHuman" className="brand-logo" />
+            <div className="brand-text-wrap">
+              <span className="brand-title">
+                HeyHuman <Sparkles size={13} style={{ color: 'var(--accent-amber)' }} />
+              </span>
+              <span className="brand-tag">Vibe Coding Alert Station</span>
+            </div>
           </div>
-        </div>
 
-        {/* Center Room Pill (Always visible) */}
-        <div className="header-center">
-          <div className="pill-button" onClick={() => setShowQR(true)} title="Click to view QR code or change room">
-            <Radio size={12} style={{ color: 'var(--accent-green)' }} />
-            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{room}</span>
+          {/* Room Pill in top row */}
+          <div className="header-center">
+            <div className="pill-button" onClick={() => setShowQR(true)} title="Click to view QR code or change room">
+              <Radio size={12} style={{ color: 'var(--accent-green)' }} />
+              <span className="room-badge-text">{room}</span>
+              <QrCode size={11} style={{ opacity: 0.6 }} />
+            </div>
           </div>
         </div>
 
@@ -623,7 +624,7 @@ export function App() {
             title={isPushSubscribed ? 'Web Push Active: Wakes your phone when screen is locked' : 'Enable Web Push for lock screen alerts'}
           >
             {isPushSubscribed ? <Bell size={13} /> : <BellOff size={13} />}
-            <span>{isPushSubscribed ? 'Lock Push On' : 'Lock Alert'}</span>
+            <span>{isPushSubscribed ? 'Push On' : 'Lock Alert'}</span>
           </button>
 
           {/* Audio Unmute Pill */}
@@ -633,12 +634,13 @@ export function App() {
             title={isAudioUnlocked ? 'Siren sound active' : 'Click to enable sirens and voice speech'}
           >
             {isAudioUnlocked ? <Volume2 size={13} /> : <VolumeX size={13} />}
-            <span>{isAudioUnlocked ? 'Sound On' : 'Enable Sound'}</span>
+            <span>{isAudioUnlocked ? 'Sound On' : 'Sound'}</span>
           </button>
 
           {/* Test Simulation Button */}
           <button onClick={handleTestAlert} className="pill-button primary" title="Simulate a real AI permission alert">
-            Test Alert
+            <Sparkles size={13} />
+            <span>Test Alert</span>
           </button>
         </div>
       </header>
@@ -650,8 +652,8 @@ export function App() {
             onClick={() => setMobileTab('monitor')}
             className={`segmented-nav-item ${mobileTab === 'monitor' ? 'active' : ''}`}
           >
-            <Smartphone size={14} />
-            <span>Live Monitor</span>
+            <Radio size={14} />
+            <span>Live Station</span>
             {pendingAlert && <span className="alert-counter-badge">1</span>}
           </button>
 
@@ -659,16 +661,8 @@ export function App() {
             onClick={() => setMobileTab('tools')}
             className={`segmented-nav-item ${mobileTab === 'tools' ? 'active' : ''}`}
           >
-            <Cpu size={14} />
-            <span>Vibe Tools</span>
-          </button>
-
-          <button
-            onClick={() => setMobileTab('activity')}
-            className={`segmented-nav-item ${mobileTab === 'activity' ? 'active' : ''}`}
-          >
-            <Sliders size={14} />
-            <span>Settings</span>
+            <Laptop size={14} />
+            <span>Connect Tools</span>
           </button>
         </div>
       </div>
@@ -815,7 +809,7 @@ export function App() {
                         </div>
                       )}
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.6rem' }}>
+                      <div className="alert-actions-grid">
                         <button
                           onClick={() => handleRemoteAction(pendingAlert.id, 'approve', 'y')}
                           style={{
@@ -880,7 +874,7 @@ export function App() {
                         </div>
                       )}
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.6rem' }}>
+                      <div className="alert-actions-grid">
                         <button
                           onClick={() => handleRemoteAction(pendingAlert.id, 'approve', 'y')}
                           style={{
@@ -931,7 +925,7 @@ export function App() {
                         <code style={{ color: '#38bdf8' }}>{pendingAlert.command}</code>
                       </div>
                     )}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.6rem' }}>
+                    <div className="alert-actions-grid">
                       <button
                         onClick={() => handleRemoteAction(pendingAlert.id, 'approve')}
                         className="submit-btn"
@@ -1071,7 +1065,7 @@ export function App() {
         {/* ======================================================== */}
         {/* RIGHT COLUMN: VIBE CODING TOOLS CONNECTION & SETTINGS     */}
         {/* ======================================================== */}
-        <div className={`vibe-column ${mobileTab === 'tools' ? '' : mobileTab === 'activity' ? 'tab-pane-mobile-hidden' : 'tab-pane-mobile-hidden'}`}>
+        <div className={`vibe-column ${mobileTab === 'tools' ? '' : 'tab-pane-mobile-hidden'}`}>
           
           <div className="surface-card">
             <div className="vibe-header">
@@ -1227,83 +1221,6 @@ export function App() {
             </div>
           </div>
         </div>
-
-        {/* ======================================================== */}
-        {/* MOBILE SETTINGS & ACTIVITY TAB CONTENT                    */}
-        {/* ======================================================== */}
-        {mobileTab === 'activity' && (
-          <div className="monitor-column" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            
-            {/* Quick Status Overview */}
-            <div className="surface-card">
-              <h3 className="card-title" style={{ marginBottom: '0.75rem' }}>Connection & Audio Preferences</h3>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '0.84rem', color: 'var(--text-1)' }}>Room ID</span>
-                  <span style={{ fontSize: '0.84rem', fontFamily: 'var(--font-mono)', color: 'var(--accent-blue)', fontWeight: 600 }}>{room}</span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '0.84rem', color: 'var(--text-1)' }}>Web Push Notifications</span>
-                  <button onClick={subscribeToWebPush} className={`pill-button ${isPushSubscribed ? 'active-green' : ''}`}>
-                    {isPushSubscribed ? 'Active' : 'Enable'}
-                  </button>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0' }}>
-                  <span style={{ fontSize: '0.84rem', color: 'var(--text-1)' }}>Emergency Siren Tone</span>
-                  <div className="tone-pills">
-                    {(['siren', 'alarm', 'chime', 'beep'] as const).map(tone => (
-                      <button
-                        key={tone}
-                        onClick={() => {
-                          setSoundType(tone);
-                          if (isAudioUnlocked) audioAlertEngine.playSound(tone);
-                        }}
-                        className={`tone-pill-btn ${soundType === tone ? 'active' : ''}`}
-                      >
-                        {tone}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Complete Activity History */}
-            <div className="surface-card">
-              <div className="card-header-row">
-                <span className="card-title">Alert History</span>
-                {alerts.length > 0 && (
-                  <button onClick={handleClear} className="skip-btn" style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <Trash2 size={12} /> Clear
-                  </button>
-                )}
-              </div>
-
-              {alerts.length === 0 ? (
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-3)', textAlign: 'center', padding: '1.5rem 0' }}>
-                  No recent alert events logged.
-                </p>
-              ) : (
-                <div className="activity-card">
-                  {alerts.map(item => (
-                    <div key={item.id} className={`activity-item ${item.resolved ? 'resolved' : ''}`}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <span className="activity-agent-name">{item.agent}</span>
-                        <p className="activity-desc">{item.description || item.command || 'Permission requested'}</p>
-                      </div>
-                      <span className="activity-time">
-                        {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
       </main>
 
