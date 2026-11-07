@@ -23,14 +23,30 @@ export class AntigravityDetector implements IAgentDetector {
   private watchedFiles = new Set<string>();
   private fileWatchers: fs.FSWatcher[] = [];
   private fileOffsets = new Map<string, number>();
+  private lineBuffers = new Map<string, string>();
   private pollTimer: NodeJS.Timeout | null = null;
   private companionServer: http.Server | null = null;
   private activePendingIds = new Set<string>();
+
+  private context?: vscode.ExtensionContext;
 
   private statusInfo: DetectorStatusInfo = {
     status: 'idle',
     message: 'Initializing detector...'
   };
+
+  private recentActions: Array<{
+    id?: string;
+    action: string;
+    input?: string;
+    selectionIndex?: number;
+    selectionText?: string;
+    timestamp: number;
+  }> = [];
+
+  constructor(context?: vscode.ExtensionContext) {
+    this.context = context;
+  }
 
   public async start(): Promise<void> {
     if (this.isRunning) {
@@ -41,10 +57,13 @@ export class AntigravityDetector implements IAgentDetector {
     // 1. Start companion server for local hooks/external integration
     this.startCompanionServer();
 
-    // 2. Discover and monitor Antigravity brain transcripts
+    // 2. Automatically ensure workspace hook is configured if a project folder is open
+    this.ensureWorkspaceHook().catch(() => {});
+
+    // 3. Discover and monitor Antigravity brain transcripts & extension logs
     this.scanAndWatchTranscripts();
 
-    // 3. Robust polling timer (every 1000ms): scans directories AND polls all watched files for updates
+    // 4. Robust polling timer (every 1000ms): scans directories AND polls all watched files for updates
     this.pollTimer = setInterval(() => {
       if (this.isRunning) {
         this.scanAndWatchTranscripts();
@@ -69,6 +88,7 @@ export class AntigravityDetector implements IAgentDetector {
     this.fileWatchers = [];
     this.watchedFiles.clear();
     this.fileOffsets.clear();
+    this.lineBuffers.clear();
     this.activePendingIds.clear();
     this.recentActions = [];
 
@@ -92,10 +112,35 @@ export class AntigravityDetector implements IAgentDetector {
   }
 
   /**
+   * Silently ensures workspace hook is configured on startup.
+   */
+  private async ensureWorkspaceHook(): Promise<void> {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) return;
+    const rootPath = folders[0].uri.fsPath;
+    const hooksJsonPath = path.join(rootPath, '.agents', 'hooks.json');
+    const hookScriptPath = path.join(rootPath, '.agents', 'scripts', 'heyhuman-hook.js');
+
+    // If hooks.json or hook script is missing, install it
+    if (!fs.existsSync(hooksJsonPath) || !fs.existsSync(hookScriptPath)) {
+      await this.setupWorkspaceHook(true);
+      return;
+    }
+
+    // If hooks.json exists, verify it contains the correct command
+    try {
+      const content = fs.readFileSync(hooksJsonPath, 'utf-8');
+      if (!content.includes('.agents/scripts/heyhuman-hook.js')) {
+        await this.setupWorkspaceHook(true);
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  /**
    * Starts a lightweight local HTTP bridge for external Antigravity sessions/scripts.
    */
-  private recentActions: Array<{ id?: string; action: string; timestamp: number }> = [];
-
   private startCompanionServer(): void {
     const port = this.settings.getAntigravityCompanionPort();
     try {
@@ -110,6 +155,7 @@ export class AntigravityDetector implements IAgentDetector {
             status: 'ok',
             service: 'HeyHuman Antigravity Companion',
             room: this.settings.getWebRoom(),
+            webEndpoint: this.settings.getWebEndpoint(),
             phoneAlertsEnabled: this.settings.isPhoneAlertsEnabled(),
             pendingCount: this.activePendingIds.size
           }));
@@ -132,6 +178,9 @@ export class AntigravityDetector implements IAgentDetector {
             ok: true,
             action: matched ? matched.action : null,
             id: matched ? matched.id : null,
+            input: matched ? matched.input : null,
+            selectionIndex: matched ? matched.selectionIndex : null,
+            selectionText: matched ? matched.selectionText : null,
             timestamp: matched ? matched.timestamp : null
           }));
           return;
@@ -148,6 +197,9 @@ export class AntigravityDetector implements IAgentDetector {
               this.recordRemoteAction({
                 id: data.id,
                 action: data.action || 'approve',
+                input: data.input,
+                selectionIndex: data.selectionIndex,
+                selectionText: data.selectionText,
                 timestamp: data.timestamp || Date.now()
               });
               res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -171,15 +223,33 @@ export class AntigravityDetector implements IAgentDetector {
               const eventId = data.id || `ag-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
               this.activePendingIds.add(eventId);
 
+              const summary = data.summary || data.description || 'Antigravity permission prompt waiting for response';
+              const details = data.details || data.command || '';
+              const questions = Array.isArray(data.questions) ? data.questions : undefined;
+              const options = Array.isArray(data.options) && data.options.length > 0 
+                ? data.options 
+                : [
+                    'Yes, allow this time',
+                    "Yes, and always allow in this conversation",
+                    "Yes, and always allow",
+                    'No (tell the agent what to do instead)'
+                  ];
+
               const event: PermissionEvent = {
                 id: eventId,
                 agent: 'antigravity',
-                type: data.type || 'confirmation_dialog',
+                type: data.type === 'question_input' ? 'question_input' : 'terminal_command',
                 state: 'pending',
-                summary: data.summary || 'Antigravity permission prompt waiting for response',
-                details: data.details,
+                summary,
+                details,
+                questions,
+                options,
+                allowCustomInput: data.allowCustomInput ?? true,
                 timestamp: Date.now(),
-                metadata: data.metadata
+                metadata: {
+                  ...data.metadata,
+                  source: 'companion_api'
+                }
               };
               this.permissionDetectedEmitter.fire(event);
               res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -240,7 +310,7 @@ export class AntigravityDetector implements IAgentDetector {
   }
 
   /**
-   * Identifies whether the current editor host or system environment is Antigravity IDE.
+   * Identifies whether the current editor host or system environment has Antigravity active.
    */
   public isAntigravityDetected(): { detected: boolean; reason: string } {
     // 1. Host editor environment (e.g. running inside Antigravity IDE)
@@ -259,13 +329,17 @@ export class AntigravityDetector implements IAgentDetector {
       return { detected: true, reason: 'Antigravity application core' };
     }
 
-    // 4. Built-in or installed Antigravity / Gemini extensions
+    // 4. Built-in or installed Antigravity / Gemini extensions in VS Code
     if (typeof vscode !== 'undefined' && vscode.extensions) {
       const hasAgExt = vscode.extensions.all.some(e =>
-        /antigravity/i.test(e.id) || /antigravity/i.test(e.packageJSON?.name || '')
+        /antigravity/i.test(e.id) ||
+        /antigravity/i.test(e.packageJSON?.name || '') ||
+        /google-antigravity/i.test(e.id) ||
+        /google.*antigravity/i.test(e.id) ||
+        /cloudcode/i.test(e.id)
       );
       if (hasAgExt) {
-        return { detected: true, reason: 'Antigravity extension active' };
+        return { detected: true, reason: 'Antigravity VS Code extension active' };
       }
     }
 
@@ -293,7 +367,7 @@ export class AntigravityDetector implements IAgentDetector {
   }
 
   /**
-   * Scans for Antigravity conversation transcript files.
+   * Scans for Antigravity conversation transcript files across IDE, CLI, and VS Code extension directories.
    */
   private scanAndWatchTranscripts(): void {
     const brainDirs = this.getBrainDirectories();
@@ -305,6 +379,13 @@ export class AntigravityDetector implements IAgentDetector {
       }
 
       try {
+        const stats = fs.statSync(brainDir);
+        if (stats.isFile() && (brainDir.endsWith('.jsonl') || brainDir.endsWith('.log'))) {
+          this.watchSingleTranscript(brainDir);
+          transcriptCount++;
+          continue;
+        }
+
         // Direct check: brainDir/.system_generated/logs/transcript.jsonl
         const directLog = path.join(brainDir, '.system_generated', 'logs', 'transcript.jsonl');
         if (fs.existsSync(directLog)) {
@@ -319,16 +400,49 @@ export class AntigravityDetector implements IAgentDetector {
           transcriptCount++;
         }
 
-        // Child folders: brainDir/<conv-id>/.system_generated/logs/transcript.jsonl
-        const convFolders = fs.readdirSync(brainDir);
-        for (const folder of convFolders) {
-          const logDir = path.join(brainDir, folder, '.system_generated', 'logs');
-          if (fs.existsSync(logDir)) {
-            const transcriptFile = path.join(logDir, 'transcript.jsonl');
-            if (fs.existsSync(transcriptFile)) {
-              this.watchSingleTranscript(transcriptFile);
+        // Direct transcript: brainDir/transcript_full.jsonl
+        const fullLog = path.join(brainDir, 'transcript_full.jsonl');
+        if (fs.existsSync(fullLog)) {
+          this.watchSingleTranscript(fullLog);
+          transcriptCount++;
+        }
+
+        // Child folders: brainDir/<conv-id>/...
+        const entries = fs.readdirSync(brainDir);
+        for (const entry of entries) {
+          const subPath = path.join(brainDir, entry);
+          try {
+            const subStats = fs.statSync(subPath);
+            if (!subStats.isDirectory()) {
+              if (entry.endsWith('.jsonl') || (entry.includes('antigravity') && entry.endsWith('.log'))) {
+                this.watchSingleTranscript(subPath);
+                transcriptCount++;
+              }
+              continue;
+            }
+
+            // Check subPath/.system_generated/logs/transcript.jsonl
+            const nestedLog = path.join(subPath, '.system_generated', 'logs', 'transcript.jsonl');
+            if (fs.existsSync(nestedLog)) {
+              this.watchSingleTranscript(nestedLog);
               transcriptCount++;
             }
+
+            // Check subPath/transcript.jsonl
+            const subFlatLog = path.join(subPath, 'transcript.jsonl');
+            if (fs.existsSync(subFlatLog)) {
+              this.watchSingleTranscript(subFlatLog);
+              transcriptCount++;
+            }
+
+            // Check subPath/transcript_full.jsonl
+            const subFullLog = path.join(subPath, 'transcript_full.jsonl');
+            if (fs.existsSync(subFullLog)) {
+              this.watchSingleTranscript(subFullLog);
+              transcriptCount++;
+            }
+          } catch {
+            // Ignore subfolder errors
           }
         }
       } catch {
@@ -365,19 +479,59 @@ export class AntigravityDetector implements IAgentDetector {
     }
 
     const home = os.homedir();
-    // Default ~/.gemini/antigravity/brain and common locations
+    // Default ~/.gemini/antigravity and common locations
     list.push(path.join(home, '.gemini', 'antigravity', 'brain'));
     list.push(path.join(home, '.gemini', 'antigravity'));
+    list.push(path.join(home, '.gemini', 'antigravity-ide', 'brain'));
+    list.push(path.join(home, '.gemini', 'antigravity-ide'));
+    list.push(path.join(home, '.gemini', 'antigravity-vscode', 'brain'));
+    list.push(path.join(home, '.gemini', 'antigravity-vscode'));
+    list.push(path.join(home, '.gemini', 'conversations'));
+    list.push(path.join(home, '.gemini'));
     list.push(path.join(home, '.antigravity', 'brain'));
     list.push(path.join(home, '.antigravity'));
     list.push(path.join(home, '.config', 'antigravity', 'brain'));
+    list.push(path.join(home, '.config', 'antigravity'));
     list.push(path.join(home, 'Library', 'Application Support', 'Antigravity', 'brain'));
     list.push(path.join(home, 'Library', 'Application Support', 'Google', 'Antigravity', 'brain'));
+
+    // Check VS Code Extension Storage (storageUri and globalStorageUri)
+    try {
+      if (this.context?.storageUri?.fsPath) {
+        const parentStorage = path.dirname(this.context.storageUri.fsPath);
+        list.push(path.join(parentStorage, 'google.google-antigravity'));
+        list.push(path.join(parentStorage, 'google.antigravity'));
+        list.push(path.join(parentStorage, 'Google.antigravity'));
+      }
+      if (this.context?.globalStorageUri?.fsPath) {
+        const parentGlobal = path.dirname(this.context.globalStorageUri.fsPath);
+        list.push(path.join(parentGlobal, 'google.google-antigravity'));
+        list.push(path.join(parentGlobal, 'google.antigravity'));
+        list.push(path.join(parentGlobal, 'Google.antigravity'));
+      }
+    } catch {
+      // Ignore
+    }
+
+    // Standard VS Code user storage directories for extensions across platforms
+    const vsCodeUserDir = process.platform === 'darwin'
+      ? path.join(home, 'Library', 'Application Support', 'Code', 'User')
+      : process.platform === 'win32'
+        ? path.join(process.env.APPDATA || '', 'Code', 'User')
+        : path.join(home, '.config', 'Code', 'User');
+
+    list.push(path.join(vsCodeUserDir, 'globalStorage', 'google.google-antigravity'));
+    list.push(path.join(vsCodeUserDir, 'globalStorage', 'google.antigravity'));
+    list.push(path.join(vsCodeUserDir, 'workspaceStorage'));
 
     // Check workspace folders
     if (typeof vscode !== 'undefined' && vscode.workspace && vscode.workspace.workspaceFolders) {
       for (const wf of vscode.workspace.workspaceFolders) {
         list.push(path.join(wf.uri.fsPath, '.gemini', 'antigravity', 'brain'));
+        list.push(path.join(wf.uri.fsPath, '.gemini', 'antigravity'));
+        list.push(path.join(wf.uri.fsPath, '.gemini', 'antigravity-ide'));
+        list.push(path.join(wf.uri.fsPath, '.gemini', 'antigravity-vscode'));
+        list.push(path.join(wf.uri.fsPath, '.gemini'));
         list.push(path.join(wf.uri.fsPath, '.agents'));
       }
     }
@@ -429,6 +583,7 @@ export class AntigravityDetector implements IAgentDetector {
       if (stats.size < prevOffset) {
         // File was truncated or restarted
         this.fileOffsets.set(filePath, 0);
+        this.lineBuffers.delete(filePath);
         return;
       }
 
@@ -444,10 +599,69 @@ export class AntigravityDetector implements IAgentDetector {
 
       this.fileOffsets.set(filePath, stats.size);
       const chunk = buffer.toString('utf-8');
-      this.parseTranscriptChunk(chunk, filePath);
+
+      // Reconstruct split lines across polling buffers
+      const prevRemainder = this.lineBuffers.get(filePath) || '';
+      const fullText = prevRemainder + chunk;
+      const lines = fullText.split('\n');
+
+      if (!fullText.endsWith('\n')) {
+        this.lineBuffers.set(filePath, lines.pop() || '');
+      } else {
+        this.lineBuffers.delete(filePath);
+      }
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) {
+          continue;
+        }
+
+        try {
+          const step = JSON.parse(line);
+          this.evaluateStep(step, filePath);
+        } catch {
+          // If not valid JSON, check if it's an extension log line indicating permission prompt
+          this.checkPlainTextLogLine(line, filePath);
+        }
+      }
     } catch (err) {
       console.warn(`[HeyHuman] Error reading transcript from ${filePath}:`, err);
     }
+  }
+
+  private checkPlainTextLogLine(line: string, sourcePath: string): void {
+    const isApproval =
+      /permission\s*(required|needed|requested)|allow\s*(run_command|command|action|execution)|waiting\s+for\s+(user\s+)?(permission|approval|confirmation)|confirm\s+(run|command|execute)|prompt.*approval/i.test(line);
+
+    if (!isApproval) {
+      return;
+    }
+
+    const id = `ag-log-${crypto.createHash('sha256').update(`${sourcePath}:${line}`).digest('hex').slice(0, 10)}`;
+    if (this.activePendingIds.has(id)) {
+      return;
+    }
+    this.activePendingIds.add(id);
+
+    const event: PermissionEvent = {
+      id,
+      agent: 'antigravity',
+      type: 'terminal_command',
+      state: 'pending',
+      summary: line.slice(0, 90),
+      details: line,
+      options: [
+        'Yes, allow this time',
+        "Yes, and always allow in this conversation",
+        "Yes, and always allow",
+        'No (tell the agent what to do instead)'
+      ],
+      allowCustomInput: true,
+      timestamp: Date.now(),
+      metadata: { sourcePath }
+    };
+    this.permissionDetectedEmitter.fire(event);
   }
 
   public parseTranscriptChunk(chunk: string, sourcePath: string): void {
@@ -462,7 +676,7 @@ export class AntigravityDetector implements IAgentDetector {
         const step = JSON.parse(line);
         this.evaluateStep(step, sourcePath);
       } catch {
-        // Not valid JSON, skip
+        this.checkPlainTextLogLine(line, sourcePath);
       }
     }
   }
@@ -473,7 +687,7 @@ export class AntigravityDetector implements IAgentDetector {
     const toolCalls = Array.isArray(step.tool_calls) ? step.tool_calls : [];
 
     // 1. Check for `ask_question` tool call
-    const askQuestionCall = toolCalls.find((t: any) => t.name === 'ask_question');
+    const askQuestionCall = toolCalls.find((t: any) => t.name === 'ask_question' || t.name === 'default_api:ask_question');
     if (askQuestionCall) {
       const qArgs = askQuestionCall.args || {};
       let parsedQuestions: Array<{ question: string; options: string[]; isMultiSelect?: boolean }> = [];
@@ -519,7 +733,7 @@ export class AntigravityDetector implements IAgentDetector {
 
     // 2. Check for `run_command` with `BypassSandbox: true`
     const bypassCall = toolCalls.find(
-      (t: any) => t.name === 'run_command' && (t.args?.BypassSandbox === true || t.args?.BypassSandbox === 'true')
+      (t: any) => (t.name === 'run_command' || t.name === 'default_api:run_command') && (t.args?.BypassSandbox === true || t.args?.BypassSandbox === 'true')
     );
     if (bypassCall) {
       const cmd = bypassCall.args?.CommandLine || 'terminal command';
@@ -640,9 +854,23 @@ export class AntigravityDetector implements IAgentDetector {
     this.activePendingIds.clear();
   }
 
-  public recordRemoteAction(action: { id?: string; action: string; timestamp?: number }): void {
+  public recordRemoteAction(action: {
+    id?: string;
+    action: string;
+    input?: string;
+    selectionIndex?: number;
+    selectionText?: string;
+    timestamp?: number;
+  }): void {
     const timestamp = action.timestamp || Date.now();
-    this.recentActions.unshift({ id: action.id, action: action.action, timestamp });
+    this.recentActions.unshift({
+      id: action.id,
+      action: action.action,
+      input: action.input,
+      selectionIndex: action.selectionIndex,
+      selectionText: action.selectionText,
+      timestamp
+    });
     if (this.recentActions.length > 50) {
       this.recentActions.pop();
     }
@@ -659,20 +887,24 @@ export class AntigravityDetector implements IAgentDetector {
 
   /**
    * Automatically configures .agents/hooks.json and .agents/scripts/heyhuman-hook.js
-   * in the user's workspace so Antigravity approvals flow seamlessly from mobile.
+   * in the user's workspace so Antigravity approvals flow seamlessly from mobile in VS Code and Antigravity IDE.
    */
-  public async setupWorkspaceHook(): Promise<boolean> {
+  public async setupWorkspaceHook(silent = false): Promise<boolean> {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
-      vscode.window.showWarningMessage('HeyHuman: Open a workspace or project folder first to install the Antigravity hook.');
+      if (!silent) {
+        vscode.window.showWarningMessage('HeyHuman: Open a workspace or project folder first to install the Antigravity hook.');
+      }
       return false;
     }
 
     const rootPath = folders[0].uri.fsPath;
     const agentsDir = path.join(rootPath, '.agents');
     const scriptsDir = path.join(agentsDir, 'scripts');
+    const rootScriptsDir = path.join(rootPath, 'scripts');
     const hooksJsonPath = path.join(agentsDir, 'hooks.json');
     const hookScriptPath = path.join(scriptsDir, 'heyhuman-hook.js');
+    const rootHookScriptPath = path.join(rootScriptsDir, 'heyhuman-hook.js');
 
     try {
       if (!fs.existsSync(agentsDir)) {
@@ -681,17 +913,21 @@ export class AntigravityDetector implements IAgentDetector {
       if (!fs.existsSync(scriptsDir)) {
         fs.mkdirSync(scriptsDir, { recursive: true });
       }
+      if (!fs.existsSync(rootScriptsDir)) {
+        fs.mkdirSync(rootScriptsDir, { recursive: true });
+      }
 
+      // Configure hooks.json with robust command resolution matching all sensitive tool calls
       const hooksConfig = {
         'heyhuman-approval': {
           enabled: true,
           PreToolUse: [
             {
-              matcher: 'run_command',
+              matcher: '*',
               hooks: [
                 {
                   type: 'command',
-                  command: 'node scripts/heyhuman-hook.js',
+                  command: 'node .agents/scripts/heyhuman-hook.js || node scripts/heyhuman-hook.js',
                   timeout: 45
                 }
               ]
@@ -706,12 +942,12 @@ export class AntigravityDetector implements IAgentDetector {
       const hookScriptCode = `#!/usr/bin/env node
 /**
  * HeyHuman Antigravity Lifecycle Hook
- * Intercepts tool calls (e.g. run_command with BypassSandbox: true).
+ * Intercepts tool calls (e.g. run_command with BypassSandbox: true or permission prompts).
  * When approval is required:
  *   1. Emits alert to HeyHuman companion and mobile room.
- *   2. Waits up to 35s for mobile action (Approve / Reject).
+ *   2. Waits up to 35s for mobile action (Approve / Reject / Option submit).
  *   3. If approved via phone: outputs { "decision": "allow" } -> Antigravity runs immediately!
- *   4. If rejected via phone: outputs { "decision": "deny" } -> Antigravity cancels tool.
+ *   4. If rejected via phone: outputs { "decision": "deny", "reason": "..." } -> Antigravity cancels tool.
  *   5. If timeout reached: outputs { "decision": "ask" } -> Falls back to desktop prompt.
  */
 
@@ -747,7 +983,7 @@ async function main() {
   const isBypass = args.BypassSandbox === true || args.BypassSandbox === 'true';
   const cmdStr = (args.CommandLine || '').toLowerCase();
   const isDestructive = cmdStr.includes('rm -rf') || cmdStr.includes('git reset --hard') || cmdStr.includes('npm publish') || cmdStr.includes('drop database');
-  const isSensitive = isBypass || toolName === 'ask_question' || isDestructive;
+  const isSensitive = isBypass || toolName === 'ask_question' || toolName.includes('run_command') || isDestructive;
 
   if (!isSensitive) {
     outputDecision('allow');
@@ -759,11 +995,16 @@ async function main() {
 
   let phoneAlertsEnabled = false;
   let room = process.env.HEYHUMAN_ROOM || '';
+  let endpoint = DEFAULT_ENDPOINT;
+
   try {
     const companionStatus = await httpGetJson(\`http://127.0.0.1:\${COMPANION_PORT}/status\`);
     if (companionStatus) {
       if (!room && companionStatus.room) {
         room = companionStatus.room;
+      }
+      if (companionStatus.webEndpoint) {
+        endpoint = companionStatus.webEndpoint;
       }
       if (companionStatus.phoneAlertsEnabled !== undefined) {
         phoneAlertsEnabled = Boolean(companionStatus.phoneAlertsEnabled);
@@ -779,6 +1020,9 @@ async function main() {
         if (!room) {
           room = s['heyhuman.webRoom'] || '';
         }
+        if (s['heyhuman.webEndpoint']) {
+          endpoint = s['heyhuman.webEndpoint'];
+        }
         if (s['heyhuman.phoneAlerts.enabled'] !== undefined) {
           phoneAlertsEnabled = Boolean(s['heyhuman.phoneAlerts.enabled']);
         }
@@ -790,20 +1034,32 @@ async function main() {
     room = 'orbit-swift-551';
   }
 
+  const standardOptions = [
+    'Yes, allow this time',
+    'Yes, and always allow in this conversation',
+    'Yes, and always allow',
+    'No (tell the agent what to do instead)'
+  ];
+
   const alertPayload = {
     id: alertId,
     agent: 'ANTIGRAVITY',
-    type: 'Permission Request',
+    type: toolName === 'ask_question' ? 'Question / Clarification' : 'Permission Request',
     tool: toolName,
-    command: String(commandStr).slice(0, 150),
-    description: \`Antigravity wants to run: \${String(commandStr).slice(0, 100)}\`,
+    command: String(commandStr).slice(0, 200),
+    description: \`Antigravity wants to run: \${String(commandStr).slice(0, 120)}\`,
+    details: String(commandStr),
+    options: standardOptions,
+    allowCustomInput: true,
     timestamp: Date.now()
   };
 
+  // 1. Notify local companion server
   httpPostJson(\`http://127.0.0.1:\${COMPANION_PORT}/alert\`, alertPayload).catch(() => {});
 
+  // 2. Notify web relay for phone & push notifications
   if (phoneAlertsEnabled && room) {
-    const webUrl = \`\${DEFAULT_ENDPOINT}/api/alert?room=\${encodeURIComponent(room)}\`;
+    const webUrl = \`\${endpoint.replace(/\\/+$/, '')}/api/alert?room=\${encodeURIComponent(room)}\`;
     await httpPostJson(webUrl, alertPayload).catch(() => {});
   }
 
@@ -813,31 +1069,35 @@ async function main() {
   while (Date.now() - startTime < maxWaitMs) {
     await sleep(600);
 
+    // 1. Check local companion server
     try {
       const compRes = await httpGetJson(\`http://127.0.0.1:\${COMPANION_PORT}/action?id=\${encodeURIComponent(alertId)}&since=\${startTime}\`);
       if (compRes && compRes.action) {
-        if (compRes.action === 'approve' || (compRes.action === 'submit_permission' && compRes.selectionIndex !== 4)) {
+        if (isActionApproved(compRes)) {
           outputDecision('allow', 'Approved remotely via HeyHuman mobile app');
           return;
-        } else if (compRes.action === 'reject' || (compRes.action === 'submit_permission' && compRes.selectionIndex === 4)) {
-          outputDecision('deny', 'Rejected remotely via HeyHuman mobile app');
+        } else if (isActionRejected(compRes)) {
+          const reason = compRes.input && compRes.input !== 'n' ? compRes.input : 'Rejected remotely via HeyHuman mobile app';
+          outputDecision('deny', reason);
           return;
         }
       }
     } catch {}
 
+    // 2. Check web relay
     if (phoneAlertsEnabled && room) {
       try {
-        const pollUrl = \`\${DEFAULT_ENDPOINT}/api/alert?room=\${encodeURIComponent(room)}&since=\${startTime - 1000}\`;
+        const pollUrl = \`\${endpoint.replace(/\\/+$/, '')}/api/alert?room=\${encodeURIComponent(room)}&since=\${startTime - 1000}\`;
         const webRes = await httpGetJson(pollUrl);
         if (webRes && Array.isArray(webRes.actions)) {
           for (const act of webRes.actions) {
             if (act.timestamp >= startTime) {
-              if (act.action === 'approve' || (act.action === 'submit_permission' && act.selectionIndex !== 4)) {
+              if (isActionApproved(act)) {
                 outputDecision('allow', 'Approved remotely via HeyHuman mobile app');
                 return;
-              } else if (act.action === 'reject' || (act.action === 'submit_permission' && act.selectionIndex === 4)) {
-                outputDecision('deny', act.input || 'Rejected remotely via HeyHuman mobile app');
+              } else if (isActionRejected(act)) {
+                const reason = act.input && act.input !== 'n' ? act.input : 'Rejected remotely via HeyHuman mobile app';
+                outputDecision('deny', reason);
                 return;
               }
             }
@@ -848,6 +1108,26 @@ async function main() {
   }
 
   outputDecision('ask', 'No mobile response received within timeout. Falling back to desktop prompt.');
+}
+
+function isActionApproved(actionObj) {
+  if (!actionObj) return false;
+  const act = actionObj.action;
+  const idx = actionObj.selectionIndex;
+  if (act === 'approve' || act === 'allow') return true;
+  if (act === 'submit_permission' || act === 'answer') {
+    return idx === undefined || idx === null || idx === 1 || idx === 2 || idx === 3;
+  }
+  return false;
+}
+
+function isActionRejected(actionObj) {
+  if (!actionObj) return false;
+  const act = actionObj.action;
+  const idx = actionObj.selectionIndex;
+  if (act === 'reject' || act === 'deny') return true;
+  if ((act === 'submit_permission' || act === 'answer') && idx === 4) return true;
+  return false;
 }
 
 function outputDecision(decision, reason) {
@@ -924,17 +1204,23 @@ main().catch(() => {
 `;
 
       fs.writeFileSync(hookScriptPath, hookScriptCode, 'utf-8');
+      fs.writeFileSync(rootHookScriptPath, hookScriptCode, 'utf-8');
 
-      if (process.platform !== 'win32' && fs.existsSync(hookScriptPath)) {
+      if (process.platform !== 'win32') {
         try {
-          fs.chmodSync(hookScriptPath, 0o755);
+          if (fs.existsSync(hookScriptPath)) fs.chmodSync(hookScriptPath, 0o755);
+          if (fs.existsSync(rootHookScriptPath)) fs.chmodSync(rootHookScriptPath, 0o755);
         } catch {}
       }
 
-      vscode.window.showInformationMessage('🚀 HeyHuman: Antigravity Mobile Approval Hook installed in .agents/hooks.json! Approvals from your phone will now auto-execute.');
+      if (!silent) {
+        vscode.window.showInformationMessage('🚀 HeyHuman: Antigravity Mobile Approval Hook installed in .agents/hooks.json! Approvals from your phone will now auto-execute.');
+      }
       return true;
     } catch (err: any) {
-      vscode.window.showErrorMessage(`HeyHuman: Failed to install hook: ${err?.message || err}`);
+      if (!silent) {
+        vscode.window.showErrorMessage(`HeyHuman: Failed to install hook: ${err?.message || err}`);
+      }
       return false;
     }
   }

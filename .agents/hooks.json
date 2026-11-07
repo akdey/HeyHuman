@@ -3,11 +3,11 @@
     "enabled": true,
     "PreToolUse": [
       {
-        "matcher": "run_command",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/heyhuman-hook.js",
+            "command": "node .agents/scripts/heyhuman-hook.js || node scripts/heyhuman-hook.js",
             "timeout": 45
           }
         ]

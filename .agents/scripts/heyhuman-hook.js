@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
  * HeyHuman Antigravity Lifecycle Hook
- * Intercepts tool calls (e.g. run_command with BypassSandbox: true).
+ * Intercepts tool calls (e.g. run_command with BypassSandbox: true or permission prompts).
  * When approval is required:
  *   1. Emits alert to HeyHuman companion and mobile room.
- *   2. Waits up to 35s for mobile action (Approve / Reject).
+ *   2. Waits up to 35s for mobile action (Approve / Reject / Option submit).
  *   3. If approved via phone: outputs { "decision": "allow" } -> Antigravity runs immediately!
- *   4. If rejected via phone: outputs { "decision": "deny" } -> Antigravity cancels tool.
+ *   4. If rejected via phone: outputs { "decision": "deny", "reason": "..." } -> Antigravity cancels tool.
  *   5. If timeout reached: outputs { "decision": "ask" } -> Falls back to desktop prompt.
  */
 
@@ -20,7 +20,6 @@ const DEFAULT_ENDPOINT = 'https://hey-human-akdey.vercel.app';
 const TIMEOUT_SECONDS = 35;
 
 async function main() {
-  // 1. Read input JSON from stdin
   let inputRaw = '';
   process.stdin.setEncoding('utf-8');
   for await (const chunk of process.stdin) {
@@ -31,7 +30,6 @@ async function main() {
   try {
     payload = JSON.parse(inputRaw || '{}');
   } catch {
-    // If not valid JSON, default to asking
     outputDecision('ask', 'Could not parse hook input');
     return;
   }
@@ -41,14 +39,12 @@ async function main() {
   const args = toolCall.args || {};
   const stepIdx = payload.stepIdx ?? 0;
 
-  // 2. Determine if this tool requires explicit human approval
   const isBypass = args.BypassSandbox === true || args.BypassSandbox === 'true';
   const cmdStr = (args.CommandLine || '').toLowerCase();
   const isDestructive = cmdStr.includes('rm -rf') || cmdStr.includes('git reset --hard') || cmdStr.includes('npm publish') || cmdStr.includes('drop database');
-  const isSensitive = isBypass || toolName === 'ask_question' || isDestructive;
+  const isSensitive = isBypass || toolName === 'ask_question' || toolName.includes('run_command') || isDestructive;
 
   if (!isSensitive) {
-    // Ordinary sandboxed command or safe tool: allow immediately without delay
     outputDecision('allow');
     return;
   }
@@ -56,97 +52,107 @@ async function main() {
   const commandStr = args.CommandLine || toolName;
   const alertId = `ag-step-${stepIdx}-hook-${Date.now()}`;
 
-  // 3. Resolve active room ID and phone alerts preference
   let phoneAlertsEnabled = false;
   let room = process.env.HEYHUMAN_ROOM || '';
+  let endpoint = DEFAULT_ENDPOINT;
+
   try {
     const companionStatus = await httpGetJson(`http://127.0.0.1:${COMPANION_PORT}/status`);
     if (companionStatus) {
-      if (!room && companionStatus.room) {
-        room = companionStatus.room;
-      }
+      if (!room && companionStatus.room) room = companionStatus.room;
       if (companionStatus.phoneAlertsEnabled !== undefined) {
         phoneAlertsEnabled = Boolean(companionStatus.phoneAlertsEnabled);
       }
+      if (companionStatus.webEndpoint) {
+        endpoint = companionStatus.webEndpoint;
+      }
     }
-  } catch {
-    // Companion server may not be up
-  }
+  } catch {}
 
   if (!room || !phoneAlertsEnabled) {
     try {
-      // Check VS Code global settings or workspace settings
       const settingsPath = path.join(process.cwd(), '.vscode', 'settings.json');
       if (fs.existsSync(settingsPath)) {
         const s = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-        if (!room) {
-          room = s['heyhuman.webRoom'] || '';
-        }
+        if (!room) room = s['heyhuman.webRoom'] || '';
         if (s['heyhuman.phoneAlerts.enabled'] !== undefined) {
           phoneAlertsEnabled = Boolean(s['heyhuman.phoneAlerts.enabled']);
+        }
+        if (s['heyhuman.webEndpoint']) {
+          endpoint = s['heyhuman.webEndpoint'];
         }
       }
     } catch {}
   }
 
   if (!room) {
-    room = 'orbit-swift-551'; // Fallback room for this project
+    room = 'orbit-swift-551';
   }
 
-  // 4. Broadcast alert to Companion and Web Relay
+  const standardOptions = [
+    'Yes, allow this time',
+    'Yes, and always allow in this conversation',
+    'Yes, and always allow',
+    'No (tell the agent what to do instead)'
+  ];
+
   const alertPayload = {
     id: alertId,
     agent: 'ANTIGRAVITY',
-    type: 'Permission Request',
+    type: toolName === 'ask_question' ? 'Question / Clarification' : 'Permission Request',
     tool: toolName,
-    command: String(commandStr).slice(0, 150),
-    description: `Antigravity wants to run: ${String(commandStr).slice(0, 100)}`,
+    command: String(commandStr).slice(0, 200),
+    description: `Antigravity wants to run: ${String(commandStr).slice(0, 120)}`,
+    details: String(commandStr),
+    options: standardOptions,
+    allowCustomInput: true,
     timestamp: Date.now()
   };
 
-  // Notify companion server (local desktop)
+  // 1. Notify local companion server
   httpPostJson(`http://127.0.0.1:${COMPANION_PORT}/alert`, alertPayload).catch(() => {});
 
-  // Notify web relay (mobile phone & Web Push) ONLY if phone alerts are enabled
+  // 2. Notify web relay for phone & push notifications
   if (phoneAlertsEnabled && room) {
-    const webUrl = `${DEFAULT_ENDPOINT}/api/alert?room=${encodeURIComponent(room)}`;
+    const webUrl = `${endpoint.replace(/\/+$/, '')}/api/alert?room=${encodeURIComponent(room)}`;
     await httpPostJson(webUrl, alertPayload).catch(() => {});
   }
 
-  // 5. Poll for remote approval or rejection from mobile phone
   const startTime = Date.now();
   const maxWaitMs = TIMEOUT_SECONDS * 1000;
 
   while (Date.now() - startTime < maxWaitMs) {
     await sleep(600);
 
-    // Check local companion server first
+    // 1. Check local companion server
     try {
       const compRes = await httpGetJson(`http://127.0.0.1:${COMPANION_PORT}/action?id=${encodeURIComponent(alertId)}&since=${startTime}`);
       if (compRes && compRes.action) {
-        if (compRes.action === 'approve') {
+        if (isActionApproved(compRes)) {
           outputDecision('allow', 'Approved remotely via HeyHuman mobile app');
           return;
-        } else if (compRes.action === 'reject') {
-          outputDecision('deny', 'Rejected remotely via HeyHuman mobile app');
+        } else if (isActionRejected(compRes)) {
+          const reason = compRes.input && compRes.input !== 'n' ? compRes.input : 'Rejected remotely via HeyHuman mobile app';
+          outputDecision('deny', reason);
           return;
         }
       }
     } catch {}
 
-    // Check web relay ONLY if phone alerts are enabled
+    // 2. Check web relay
     if (phoneAlertsEnabled && room) {
       try {
-        const pollUrl = `${DEFAULT_ENDPOINT}/api/alert?room=${encodeURIComponent(room)}&since=${startTime - 1000}`;
+        const pollUrl = `${endpoint.replace(/\/+$/, '')}/api/alert?room=${encodeURIComponent(room)}&since=${startTime - 1000}`;
         const webRes = await httpGetJson(pollUrl);
         if (webRes && Array.isArray(webRes.actions)) {
           for (const act of webRes.actions) {
             if (act.timestamp >= startTime) {
-              if (act.action === 'approve') {
+              if (isActionApproved(act)) {
                 outputDecision('allow', 'Approved remotely via HeyHuman mobile app');
                 return;
-              } else if (act.action === 'reject') {
-                outputDecision('deny', 'Rejected remotely via HeyHuman mobile app');
+              } else if (isActionRejected(act)) {
+                const reason = act.input && act.input !== 'n' ? act.input : 'Rejected remotely via HeyHuman mobile app';
+                outputDecision('deny', reason);
                 return;
               }
             }
@@ -156,8 +162,27 @@ async function main() {
     }
   }
 
-  // 6. Timed out waiting for mobile response: fall back to desktop prompt
   outputDecision('ask', 'No mobile response received within timeout. Falling back to desktop prompt.');
+}
+
+function isActionApproved(actionObj) {
+  if (!actionObj) return false;
+  const act = actionObj.action;
+  const idx = actionObj.selectionIndex;
+  if (act === 'approve' || act === 'allow') return true;
+  if (act === 'submit_permission' || act === 'answer') {
+    return idx === undefined || idx === null || idx === 1 || idx === 2 || idx === 3;
+  }
+  return false;
+}
+
+function isActionRejected(actionObj) {
+  if (!actionObj) return false;
+  const act = actionObj.action;
+  const idx = actionObj.selectionIndex;
+  if (act === 'reject' || act === 'deny') return true;
+  if ((act === 'submit_permission' || act === 'answer') && idx === 4) return true;
+  return false;
 }
 
 function outputDecision(decision, reason) {

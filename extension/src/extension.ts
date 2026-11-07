@@ -49,7 +49,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // 3. Initialize Detectors
   const copilotDetector = new CopilotDetector(context);
-  const antigravityDetector = new AntigravityDetector();
+  const antigravityDetector = new AntigravityDetector(context);
   const claudeDetector = new ClaudeDetector();
   const cursorDetector = new CursorDetector();
   const aiderDetector = new AiderDetector();
