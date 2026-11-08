@@ -57,10 +57,7 @@ export class AntigravityDetector implements IAgentDetector {
     // 1. Start companion server for local hooks/external integration
     this.startCompanionServer();
 
-    // 2. Automatically ensure workspace hook is configured if a project folder is open
-    this.ensureWorkspaceHook().catch(() => {});
-
-    // 3. Discover and monitor Antigravity brain transcripts & extension logs
+    // 2. Discover and monitor Antigravity brain transcripts & extension logs
     this.scanAndWatchTranscripts();
 
     // 4. Robust polling timer (every 1000ms): scans directories AND polls all watched files for updates
@@ -109,33 +106,6 @@ export class AntigravityDetector implements IAgentDetector {
 
   public getStatus(): DetectorStatusInfo {
     return this.statusInfo;
-  }
-
-  /**
-   * Silently ensures workspace hook is configured on startup.
-   */
-  private async ensureWorkspaceHook(): Promise<void> {
-    const folders = vscode.workspace.workspaceFolders;
-    if (!folders || folders.length === 0) return;
-    const rootPath = folders[0].uri.fsPath;
-    const hooksJsonPath = path.join(rootPath, '.agents', 'hooks.json');
-    const hookScriptPath = path.join(rootPath, '.agents', 'scripts', 'heyhuman-hook.js');
-
-    // If hooks.json or hook script is missing, install it
-    if (!fs.existsSync(hooksJsonPath) || !fs.existsSync(hookScriptPath)) {
-      await this.setupWorkspaceHook(true);
-      return;
-    }
-
-    // If hooks.json exists, verify it contains the correct command
-    try {
-      const content = fs.readFileSync(hooksJsonPath, 'utf-8');
-      if (!content.includes('.agents/scripts/heyhuman-hook.js')) {
-        await this.setupWorkspaceHook(true);
-      }
-    } catch {
-      // Ignore
-    }
   }
 
   /**
@@ -901,10 +871,8 @@ export class AntigravityDetector implements IAgentDetector {
     const rootPath = folders[0].uri.fsPath;
     const agentsDir = path.join(rootPath, '.agents');
     const scriptsDir = path.join(agentsDir, 'scripts');
-    const rootScriptsDir = path.join(rootPath, 'scripts');
     const hooksJsonPath = path.join(agentsDir, 'hooks.json');
     const hookScriptPath = path.join(scriptsDir, 'heyhuman-hook.js');
-    const rootHookScriptPath = path.join(rootScriptsDir, 'heyhuman-hook.js');
 
     try {
       if (!fs.existsSync(agentsDir)) {
@@ -913,27 +881,31 @@ export class AntigravityDetector implements IAgentDetector {
       if (!fs.existsSync(scriptsDir)) {
         fs.mkdirSync(scriptsDir, { recursive: true });
       }
-      if (!fs.existsSync(rootScriptsDir)) {
-        fs.mkdirSync(rootScriptsDir, { recursive: true });
+
+      // Preserve existing hooks if present and merge heyhuman-approval
+      let hooksConfig: Record<string, any> = {};
+      if (fs.existsSync(hooksJsonPath)) {
+        try {
+          hooksConfig = JSON.parse(fs.readFileSync(hooksJsonPath, 'utf-8'));
+        } catch {
+          hooksConfig = {};
+        }
       }
 
-      // Configure hooks.json with robust command resolution matching all sensitive tool calls
-      const hooksConfig = {
-        'heyhuman-approval': {
-          enabled: true,
-          PreToolUse: [
-            {
-              matcher: '*',
-              hooks: [
-                {
-                  type: 'command',
-                  command: 'node .agents/scripts/heyhuman-hook.js || node scripts/heyhuman-hook.js',
-                  timeout: 45
-                }
-              ]
-            }
-          ]
-        }
+      hooksConfig['heyhuman-approval'] = {
+        enabled: true,
+        PreToolUse: [
+          {
+            matcher: 'run_command',
+            hooks: [
+              {
+                type: 'command',
+                command: 'node scripts/heyhuman-hook.js || node .agents/scripts/heyhuman-hook.js',
+                timeout: 45
+              }
+            ]
+          }
+        ]
       };
 
       fs.writeFileSync(hooksJsonPath, JSON.stringify(hooksConfig, null, 2), 'utf-8');
@@ -1204,12 +1176,10 @@ main().catch(() => {
 `;
 
       fs.writeFileSync(hookScriptPath, hookScriptCode, 'utf-8');
-      fs.writeFileSync(rootHookScriptPath, hookScriptCode, 'utf-8');
 
       if (process.platform !== 'win32') {
         try {
           if (fs.existsSync(hookScriptPath)) fs.chmodSync(hookScriptPath, 0o755);
-          if (fs.existsSync(rootHookScriptPath)) fs.chmodSync(rootHookScriptPath, 0o755);
         } catch {}
       }
 

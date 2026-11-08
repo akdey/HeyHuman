@@ -2,6 +2,12 @@
 
 All notable changes to the "heyhuman" extension will be documented in this file.
 
+## [1.3.3] - 2026-11-08
+
+### Changed
+- **Opt-In Workspace Hook**: Removed automatic writing of `.agents/hooks.json` on startup. HeyHuman monitors Antigravity transcripts and permission requests passively without creating or modifying any workspace files.
+- **Safe Hook Merging**: The optional "Zero-Touch Mobile Approvals" hook is now strictly triggered on-demand via the command `HeyHuman: Enable Antigravity Mobile Approvals` (`heyhuman.setupAntigravityHook`), preserving existing hooks and keeping scripts isolated inside `.agents/scripts/`.
+
 ## [1.3.2] - 2026-11-07
 
 ### Fixed
