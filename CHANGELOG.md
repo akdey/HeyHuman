@@ -2,6 +2,21 @@
 
 All notable changes to the "heyhuman" extension will be documented in this file.
 
+## [1.3.3] - 2026-11-08
+
+### Changed
+- **Opt-In Workspace Hook**: Removed automatic writing of `.agents/hooks.json` on startup. HeyHuman monitors Antigravity transcripts and permission requests passively without creating or modifying any workspace files.
+- **Safe Hook Merging**: The optional "Zero-Touch Mobile Approvals" hook is now strictly triggered on-demand via the command `HeyHuman: Enable Antigravity Mobile Approvals` (`heyhuman.setupAntigravityHook`), preserving existing hooks and keeping scripts isolated inside `.agents/scripts/`.
+
+## [1.3.2] - 2026-11-07
+
+### Fixed
+- **Google Antigravity VS Code Extension Compatibility**: Ensured full parity when running the Google Antigravity extension (`google.google-antigravity`) inside standard VS Code as well as Antigravity IDE.
+- **Transcript Polling Across VS Code Storage Roots**: Expanded discovery to scan VS Code `globalStorageUri`, `workspaceStorageUri`, workspace-scoped `.gemini/antigravity*`, and `~/.gemini/antigravity-vscode`.
+- **Stream Ingestion & Line Buffering**: Fixed transcript line splitting during incremental writes with an internal line-buffer map and plain-text fallback matcher.
+- **Hook Dual-Path & Action Parity**: Updated `.agents/hooks.json` matcher to `run_command` and command resolution. Handled `submit_permission` with selection indices (1-3 allow, 4 deny with custom feedback) across both Companion Server and Web Relay.
+- **Companion Server Payload Persistence**: Preserved `summary`, `details`, `command`, `options`, `selectionIndex`, and `input` fields on local port 47291.
+
 ## [1.3.1] - 2026-10-26
 
 ### Fixed
